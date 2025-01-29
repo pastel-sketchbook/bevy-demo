@@ -31,6 +31,8 @@ const CAMERA_X: f32 = -2.0;
 const CAMERA_Y: f32 = 3.0;
 const CAMERA_Z: f32 = 5.0;
 const COLOR_INCREMENT: f32 = 0.02;
+const MIN_BLINK_SPEED: f32 = 0.5;
+const MAX_BLINK_SPEED: f32 = 2.0;
 
 fn main() {
     App::new()
@@ -46,9 +48,9 @@ fn main() {
         // set the global default clear color
         // Changed ClearColor to an very dark greenish color
         .insert_resource(ClearColor(BACKGROUND_COLOR))
-        .insert_resource(RandomSource(ChaCha8Rng::seed_from_u64(RANDOM_SEED))) // Insert RandomSource resource here, before setup system
+        .insert_resource(RandomSource(ChaCha8Rng::seed_from_u64(RANDOM_SEED)))
         .add_systems(Startup, setup)
-        .add_systems(Update, (move_firefly, handle_keyboard_input)) // Add the new system here
+        .add_systems(Update, (move_firefly, firefly_blink, handle_keyboard_input))
         .run();
 }
 
@@ -64,6 +66,13 @@ struct FireflyPosition(Vec3);
 #[derive(Resource)]
 struct RandomSource(ChaCha8Rng);
 
+#[derive(Component)]
+struct Blink {
+    speed: f32,
+    timer: Timer,
+    max_alpha: f32,
+}
+
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -72,7 +81,8 @@ fn setup(
 ) {
     let mut rng = rand::thread_rng();
     let num_fireflies = rng.gen_range(MIN_FIREFLIES..=MAX_FIREFLIES);
-    let legal_region = Cuboid::from_size(Vec3::splat(WORLD_SIZE)); // Define the legal region here
+    // Define the legal region here
+    let legal_region = Cuboid::from_size(Vec3::splat(WORLD_SIZE));
 
     for _ in 0..num_fireflies {
         let size_random = rng.gen_range(MIN_SIZE..MAX_SIZE);
@@ -82,7 +92,9 @@ fn setup(
         let green_random = rng.gen_range(MIN_COLOR..MAX_COLOR);
         let blue_random = rng.gen_range(MIN_COLOR..MAX_COLOR);
         let alpha_random = rng.gen_range(MIN_ALPHA..MAX_ALPHA);
-        let random_position = legal_region.sample_interior(&mut rng_res.0); // Generate random position
+        let random_position = legal_region.sample_interior(&mut rng_res.0);
+        let blink_speed_random = rng.gen_range(MIN_BLINK_SPEED..MAX_BLINK_SPEED);
+
         let firefly_color = Color::srgba(red_random, green_random, blue_random, alpha_random);
         let firefly_mesh = meshes.add(Sphere::new(size_random));
         let firefly_material = materials.add(firefly_color);
@@ -96,6 +108,12 @@ fn setup(
             Firefly,
             FireflySpeed(speed_random),
             FireflyPosition(random_position), // Set the random initial position
+            Blink {
+                // Added Blink component with random speed and max_alpha
+                speed: blink_speed_random,
+                timer: Timer::from_seconds(0.0, TimerMode::Repeating),
+                max_alpha: alpha_random,
+            },
         ));
     }
 
@@ -130,10 +148,44 @@ fn move_firefly(
         }
         // Use Vec3::normalize() directly
         let move_direction = target_direction.normalize();
-        let delta_time = time.delta_secs(); // Use delta_secs() which is correct for Bevy 0.15.1
+        let delta_time = time.delta_secs();
         let abs_delta = target_direction.length(); // Calculate length directly
         let magnitude = f32::min(abs_delta, delta_time * target_speed.0);
         transform.translation += move_direction * magnitude;
+    }
+}
+
+fn firefly_blink(
+    mut query: Query<(&MeshMaterial3d<StandardMaterial>, &mut Blink)>,
+    time: Res<Time>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    for (material_component, mut blink) in query.iter_mut() {
+        blink.timer.tick(time.delta());
+        let fraction = blink.timer.elapsed_secs() * blink.speed;
+        // Use a sine wave to create a smooth blink effect, range [0.5, 1.0] to avoid completely invisible
+        let alpha_multiplier =
+            (f32::sin(fraction * std::f32::consts::PI * 2.0) * 0.25 + 0.75).clamp(0.5, 1.0);
+
+        // Get the Handle<StandardMaterial> from MeshMaterial3d
+        let material_handle = material_component.0.clone(); // Clone the handle *before* if let
+
+        // Access the Assets<StandardMaterial> resource and get the Material
+        if let Some(material) = materials.get_mut(&material_handle) {
+            // Use materials.get_mut(handle)
+            // Corrected way to set alpha: Pattern match and reconstruct Color
+            if let Color::Srgba(Srgba {
+                red, green, blue, ..
+            }) = material.base_color
+            {
+                material.base_color = Color::srgba(
+                    red,
+                    green,
+                    blue,
+                    blink.max_alpha * alpha_multiplier, // Set new alpha
+                );
+            }
+        }
     }
 }
 
