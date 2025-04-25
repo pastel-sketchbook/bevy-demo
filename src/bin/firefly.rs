@@ -237,6 +237,6 @@ fn handle_keyboard_input(
 
     if keyboard_input.pressed(KeyCode::KeyQ) {
         // Quit the application when Q is pressed
-        app_exit_events.send(AppExit::Success);
+        app_exit_events.write(AppExit::Success);
     }
 }

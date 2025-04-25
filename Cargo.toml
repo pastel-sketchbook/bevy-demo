@@ -1,7 +1,7 @@
 [package]
 name = "bevy-demo"
-version = "0.1.0"
-edition = "2021"
+version = "0.2.1"
+edition = "2024"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
@@ -12,7 +12,7 @@ opt-level = 1
 opt-level = 3
 
 [dependencies]
-bevy = "0.15.1"
+bevy = "0.16.0"
 rand = "0.8.0"
 rand_chacha = "0.3.1"
 
