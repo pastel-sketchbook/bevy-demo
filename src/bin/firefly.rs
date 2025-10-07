@@ -40,7 +40,7 @@ fn main() {
             primary_window: Some(Window {
                 // Remove window frame by setting borderless to true
                 decorations: false,
-                resolution: WindowResolution::new(WINDOW_WIDTH, WINDOW_HEIGHT),
+                resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
                 ..default()
             }),
             ..default()
@@ -79,21 +79,21 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut rng_res: ResMut<RandomSource>,
 ) {
-    let mut rng = rand::thread_rng();
-    let num_fireflies = rng.gen_range(MIN_FIREFLIES..=MAX_FIREFLIES);
+    let mut rng = rand::rng();
+    let num_fireflies = rng.random_range(MIN_FIREFLIES..=MAX_FIREFLIES);
     // Define the legal region here
     let legal_region = Cuboid::from_size(Vec3::splat(WORLD_SIZE));
 
     for _ in 0..num_fireflies {
-        let size_random = rng.gen_range(MIN_SIZE..MAX_SIZE);
+        let size_random = rng.random_range(MIN_SIZE..MAX_SIZE);
         // Updated speed range to 0.05..2.0 for slower movement
-        let speed_random = rng.gen_range(MIN_SPEED..MAX_SPEED);
-        let red_random = rng.gen_range(MIN_COLOR..MAX_COLOR);
-        let green_random = rng.gen_range(MIN_COLOR..MAX_COLOR);
-        let blue_random = rng.gen_range(MIN_COLOR..MAX_COLOR);
-        let alpha_random = rng.gen_range(MIN_ALPHA..MAX_ALPHA);
+        let speed_random = rng.random_range(MIN_SPEED..MAX_SPEED);
+        let red_random = rng.random_range(MIN_COLOR..MAX_COLOR);
+        let green_random = rng.random_range(MIN_COLOR..MAX_COLOR);
+        let blue_random = rng.random_range(MIN_COLOR..MAX_COLOR);
+        let alpha_random = rng.random_range(MIN_ALPHA..MAX_ALPHA);
         let random_position = legal_region.sample_interior(&mut rng_res.0);
-        let blink_speed_random = rng.gen_range(MIN_BLINK_SPEED..MAX_BLINK_SPEED);
+        let blink_speed_random = rng.random_range(MIN_BLINK_SPEED..MAX_BLINK_SPEED);
 
         let firefly_color = Color::srgba(red_random, green_random, blue_random, alpha_random);
         let firefly_mesh = meshes.add(Sphere::new(size_random));
@@ -193,7 +193,7 @@ fn firefly_blink(
 fn handle_keyboard_input(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut clear_color: ResMut<ClearColor>,
-    mut app_exit_events: EventWriter<AppExit>,
+    mut app_exit_events: MessageWriter<AppExit>,
 ) {
     let increment = COLOR_INCREMENT; // Use constant
 

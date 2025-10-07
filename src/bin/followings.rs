@@ -53,7 +53,7 @@ fn setup(
         Transform::from_xyz(0.0, -2.5, 0.0),
     ));
 
-    let rng = rand::thread_rng().gen_range(0.9..1.0);
+    let rng = rand::rng().random_range(0.9..1.0);
     // The target sphere:
     commands.spawn((
         Mesh3d(meshes.add(Sphere::new(0.3))),
