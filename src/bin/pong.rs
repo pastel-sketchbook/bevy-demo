@@ -7,7 +7,7 @@ use bevy::{
     prelude::*,
     window::{WindowPlugin, WindowPosition, WindowResolution},
 };
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 
 // --- Constants ---
 const WINDOW_WIDTH: f32 = 1606.0;
@@ -17,10 +17,12 @@ const PADDLE_HEIGHT: f32 = 80.0;
 const PADDLE_SPEED: f32 = 400.0;
 const PADDLE_OFFSET: f32 = 50.0;
 const BALL_RADIUS: f32 = 10.0;
-const BALL_SPEED: f32 = 300.0;
+const MIN_BALL_SPEED: f32 = 200.0;
+const MAX_BALL_SPEED: f32 = 500.0;
 const PADDLE_COLOR: Color = Color::srgb(0.9, 0.9, 0.9);
 const BALL_COLOR: Color = Color::srgb(1.0, 1.0, 0.0);
 const RANDOM_SEED: u64 = 12345678901234;
+const AI_REACTION_SPEED: f32 = 0.85; // AI tracks ball at 85% of paddle speed
 
 #[cfg(feature = "transparent")]
 const BACKGROUND_COLOR: Color = Color::srgba(0.0, 0.08, 0.04, 0.3);
@@ -155,15 +157,20 @@ fn random_ball_direction(rng: &mut SmallRng) -> Vec2 {
     } else {
         rng.random_range(std::f32::consts::PI - 0.5..std::f32::consts::PI + 0.5)
     };
-    Vec2::new(angle.cos(), angle.sin()) * BALL_SPEED
+    let speed = rng.random_range(MIN_BALL_SPEED..MAX_BALL_SPEED);
+    Vec2::new(angle.cos(), angle.sin()) * speed
 }
 
 fn move_paddles(
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     window: Query<&Window>,
-    mut left_paddle: Query<&mut Transform, (With<LeftPaddle>, Without<RightPaddle>)>,
-    mut right_paddle: Query<&mut Transform, (With<RightPaddle>, Without<LeftPaddle>)>,
+    ball: Query<&Transform, With<Ball>>,
+    mut left_paddle: Query<&mut Transform, (With<LeftPaddle>, Without<RightPaddle>, Without<Ball>)>,
+    mut right_paddle: Query<
+        &mut Transform,
+        (With<RightPaddle>, Without<LeftPaddle>, Without<Ball>),
+    >,
     mut app_exit: MessageWriter<AppExit>,
 ) {
     if keyboard.pressed(KeyCode::KeyQ) {
@@ -173,29 +180,29 @@ fn move_paddles(
     let Ok(window) = window.single() else {
         return;
     };
+    let Ok(ball_transform) = ball.single() else {
+        return;
+    };
+
     let half_height = window.height() / 2.0;
     let paddle_half = PADDLE_HEIGHT / 2.0;
     let max_y = half_height - paddle_half;
+    let ball_y = ball_transform.translation.y;
+    let ai_speed = PADDLE_SPEED * AI_REACTION_SPEED;
 
-    // Left paddle (W/S)
+    // Left paddle - AI controlled
     if let Ok(mut transform) = left_paddle.single_mut() {
-        if keyboard.pressed(KeyCode::KeyW) {
-            transform.translation.y += PADDLE_SPEED * time.delta_secs();
-        }
-        if keyboard.pressed(KeyCode::KeyS) {
-            transform.translation.y -= PADDLE_SPEED * time.delta_secs();
-        }
+        let diff = ball_y - transform.translation.y;
+        let move_amount = diff.signum() * ai_speed.min(diff.abs()) * time.delta_secs();
+        transform.translation.y += move_amount;
         transform.translation.y = transform.translation.y.clamp(-max_y, max_y);
     }
 
-    // Right paddle (Up/Down)
+    // Right paddle - AI controlled
     if let Ok(mut transform) = right_paddle.single_mut() {
-        if keyboard.pressed(KeyCode::ArrowUp) {
-            transform.translation.y += PADDLE_SPEED * time.delta_secs();
-        }
-        if keyboard.pressed(KeyCode::ArrowDown) {
-            transform.translation.y -= PADDLE_SPEED * time.delta_secs();
-        }
+        let diff = ball_y - transform.translation.y;
+        let move_amount = diff.signum() * ai_speed.min(diff.abs()) * time.delta_secs();
+        transform.translation.y += move_amount;
         transform.translation.y = transform.translation.y.clamp(-max_y, max_y);
     }
 }
