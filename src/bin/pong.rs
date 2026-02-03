@@ -1,5 +1,7 @@
 //! Classic Pong game demonstrating 2D rendering with Mesh2d, collision detection, and scoring.
 
+#[cfg(feature = "transparent")]
+use bevy::window::CompositeAlphaMode;
 use bevy::{
     app::AppExit,
     prelude::*,
@@ -16,10 +18,14 @@ const PADDLE_SPEED: f32 = 400.0;
 const PADDLE_OFFSET: f32 = 50.0;
 const BALL_RADIUS: f32 = 10.0;
 const BALL_SPEED: f32 = 300.0;
-const BACKGROUND_COLOR: Color = Color::srgb(0.0, 0.08, 0.04); // Dark arcade green
 const PADDLE_COLOR: Color = Color::srgb(0.9, 0.9, 0.9);
 const BALL_COLOR: Color = Color::srgb(1.0, 1.0, 0.0);
 const RANDOM_SEED: u64 = 12345678901234;
+
+#[cfg(feature = "transparent")]
+const BACKGROUND_COLOR: Color = Color::srgba(0.0, 0.08, 0.04, 0.3);
+#[cfg(not(feature = "transparent"))]
+const BACKGROUND_COLOR: Color = Color::srgb(0.0, 0.08, 0.04); // Dark arcade green
 
 #[cfg(feature = "window-offset")]
 fn offset_window(mut windows: Query<&mut Window>, mut done: Local<bool>) {
@@ -38,6 +44,10 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 decorations: false,
+                #[cfg(feature = "transparent")]
+                transparent: true,
+                #[cfg(feature = "transparent")]
+                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
                 resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
                 position: WindowPosition::Centered(MonitorSelection::Primary),
                 ..default()

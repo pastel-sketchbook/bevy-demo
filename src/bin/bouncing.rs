@@ -1,5 +1,7 @@
 //! Bouncing shapes demo - demonstrates velocity-based movement, boundary collision, shape morphing.
 
+#[cfg(feature = "transparent")]
+use bevy::window::CompositeAlphaMode;
 use bevy::{
     app::AppExit,
     prelude::*,
@@ -16,6 +18,10 @@ const MIN_SPEED: f32 = 100.0;
 const MAX_SPEED: f32 = 300.0;
 const RANDOM_SEED: u64 = 42;
 const SHAPE_TYPES: usize = 5;
+
+#[cfg(feature = "transparent")]
+const BACKGROUND_COLOR: Color = Color::srgba(0.08, 0.05, 0.15, 0.3);
+#[cfg(not(feature = "transparent"))]
 const BACKGROUND_COLOR: Color = Color::srgb(0.08, 0.05, 0.15); // Dark purple
 
 #[cfg(feature = "window-offset")]
@@ -31,6 +37,10 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 decorations: false,
+                #[cfg(feature = "transparent")]
+                transparent: true,
+                #[cfg(feature = "transparent")]
+                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
                 resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
                 #[cfg(not(feature = "window-offset"))]
                 position: WindowPosition::Centered(MonitorSelection::Primary),

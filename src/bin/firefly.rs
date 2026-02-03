@@ -1,3 +1,5 @@
+#[cfg(feature = "transparent")]
+use bevy::window::CompositeAlphaMode;
 use bevy::{
     app::AppExit,
     math::prelude::*,
@@ -9,7 +11,11 @@ use rand::{Rng, SeedableRng, rngs::SmallRng};
 // --- Constants ---
 const WINDOW_WIDTH: f32 = 1606.0;
 const WINDOW_HEIGHT: f32 = 1036.0;
-const BACKGROUND_COLOR: Color = Color::srgba(0.07, 0.14, 0.04, 1.0);
+
+#[cfg(feature = "transparent")]
+const BACKGROUND_COLOR: Color = Color::srgba(0.07, 0.14, 0.04, 0.3);
+#[cfg(not(feature = "transparent"))]
+const BACKGROUND_COLOR: Color = Color::srgb(0.07, 0.14, 0.04);
 const RANDOM_SEED: u64 = 68941654987813521;
 const MIN_FIREFLIES: usize = 30;
 const MAX_FIREFLIES: usize = 70;
@@ -38,6 +44,10 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 decorations: false,
+                #[cfg(feature = "transparent")]
+                transparent: true,
+                #[cfg(feature = "transparent")]
+                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
                 resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
                 position: WindowPosition::Centered(MonitorSelection::Primary),
                 ..default()

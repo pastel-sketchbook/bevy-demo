@@ -1,5 +1,7 @@
 //! Boids flocking simulation demonstrating separation, alignment, and cohesion.
 
+#[cfg(feature = "transparent")]
+use bevy::window::CompositeAlphaMode;
 use bevy::{
     app::AppExit,
     prelude::*,
@@ -17,6 +19,10 @@ const SEPARATION_WEIGHT: f32 = 1.5;
 const ALIGNMENT_WEIGHT: f32 = 1.0;
 const COHESION_WEIGHT: f32 = 1.0;
 const RANDOM_SEED: u64 = 12345678901234;
+
+#[cfg(feature = "transparent")]
+const BACKGROUND_COLOR: Color = Color::srgba(0.02, 0.05, 0.12, 0.3);
+#[cfg(not(feature = "transparent"))]
 const BACKGROUND_COLOR: Color = Color::srgb(0.02, 0.05, 0.12);
 
 #[cfg(feature = "window-offset")]
@@ -36,6 +42,10 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 decorations: false,
+                #[cfg(feature = "transparent")]
+                transparent: true,
+                #[cfg(feature = "transparent")]
+                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
                 resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
                 position: WindowPosition::Centered(MonitorSelection::Primary),
                 ..default()

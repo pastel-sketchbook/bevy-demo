@@ -1,6 +1,6 @@
 [package]
 name = "bevy-demo"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 
 # Enable a small amount of optimization in the dev profile.
@@ -14,6 +14,8 @@ opt-level = 3
 [features]
 # Enable window offset for local development (offsets window 20px to the right)
 window-offset = []
+# Enable transparent window background to see desktop wallpaper
+transparent = []
 
 [dependencies]
 bevy = "0.18.0"

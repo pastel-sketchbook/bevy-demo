@@ -5,7 +5,7 @@ tasks:
   build:
     cmds:
       - cargo fmt
-      - cargo build --release --features window-offset
+      - cargo build --release --features window-offset,transparent
   run:
     cmds:
       - target/release/$PGM_NAME

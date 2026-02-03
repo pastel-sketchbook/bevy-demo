@@ -24,17 +24,38 @@ assets/           # Game assets (textures, models, etc.)
 ```bash
 # Build
 cargo build --release
-task build              # Format + build release
+task build              # Format + build release with features
 
 # Run examples
 cargo run --bin firefly
 cargo run --bin followings
 task run                # Runs firefly (default)
 
+# Run with features
+cargo run --bin firefly --features transparent
+cargo run --bin firefly --features "transparent,window-offset"
+
 # Check/lint
 cargo check
 cargo fmt
 cargo clippy
+```
+
+## Feature Flags
+
+| Feature | Description |
+|---------|-------------|
+| `window-offset` | Offset window position for local development (160, 88) |
+| `transparent` | Enable semi-transparent window background to see desktop wallpaper |
+
+Features are enabled in Taskfile by default:
+```bash
+task build  # Builds with window-offset,transparent
+```
+
+To build without features:
+```bash
+cargo build --release
 ```
 
 ## Development Principles

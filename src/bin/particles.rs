@@ -2,6 +2,8 @@
 //!
 //! Demonstrates continuous particle spawning with velocity, lifetime, and fade-out.
 
+#[cfg(feature = "transparent")]
+use bevy::window::CompositeAlphaMode;
 use bevy::{
     app::AppExit,
     prelude::*,
@@ -16,6 +18,10 @@ const SPAWN_RATE: f32 = 50.0; // particles per second
 const PARTICLE_LIFETIME: f32 = 2.0;
 const PARTICLE_SPEED: f32 = 150.0;
 const PARTICLE_SIZE: f32 = 8.0;
+
+#[cfg(feature = "transparent")]
+const BACKGROUND_COLOR: Color = Color::srgba(0.1, 0.02, 0.08, 0.3);
+#[cfg(not(feature = "transparent"))]
 const BACKGROUND_COLOR: Color = Color::srgb(0.1, 0.02, 0.08); // Dark magenta
 
 fn main() {
@@ -23,6 +29,10 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 decorations: false,
+                #[cfg(feature = "transparent")]
+                transparent: true,
+                #[cfg(feature = "transparent")]
+                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
                 resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
                 position: WindowPosition::Centered(MonitorSelection::Primary),
                 ..default()

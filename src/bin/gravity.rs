@@ -1,6 +1,8 @@
 //! Gravitational attraction simulation with a sun and orbiting planets.
 //! Press Space to add a new random planet.
 
+#[cfg(feature = "transparent")]
+use bevy::window::CompositeAlphaMode;
 use bevy::{
     app::AppExit,
     prelude::*,
@@ -10,8 +12,12 @@ use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 const WINDOW_WIDTH: f32 = 1606.0;
 const WINDOW_HEIGHT: f32 = 1036.0;
-const BACKGROUND_COLOR: Color = Color::srgb(0.01, 0.01, 0.03); // Near black (space)
 const RANDOM_SEED: u64 = 42;
+
+#[cfg(feature = "transparent")]
+const BACKGROUND_COLOR: Color = Color::srgba(0.01, 0.01, 0.03, 0.3);
+#[cfg(not(feature = "transparent"))]
+const BACKGROUND_COLOR: Color = Color::srgb(0.01, 0.01, 0.03); // Near black (space)
 
 const SUN_MASS: f32 = 1000.0;
 const SUN_RADIUS: f32 = 30.0;
@@ -39,6 +45,10 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 decorations: false,
+                #[cfg(feature = "transparent")]
+                transparent: true,
+                #[cfg(feature = "transparent")]
+                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
                 resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
                 position: WindowPosition::Centered(MonitorSelection::Primary),
                 ..default()

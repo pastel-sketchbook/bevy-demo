@@ -6,6 +6,8 @@
 //! - Arrow key movement
 //! - No external assets required
 
+#[cfg(feature = "transparent")]
+use bevy::window::CompositeAlphaMode;
 use bevy::{
     app::AppExit,
     prelude::*,
@@ -17,6 +19,10 @@ const WINDOW_HEIGHT: f32 = 1036.0;
 const SPRITE_SIZE: f32 = 64.0;
 const MOVE_SPEED: f32 = 300.0;
 const FRAME_DURATION: f32 = 0.15;
+
+#[cfg(feature = "transparent")]
+const BACKGROUND_COLOR: Color = Color::srgba(0.03, 0.1, 0.1, 0.3);
+#[cfg(not(feature = "transparent"))]
 const BACKGROUND_COLOR: Color = Color::srgb(0.03, 0.1, 0.1);
 
 #[cfg(feature = "window-offset")]
@@ -45,6 +51,10 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 decorations: false,
+                #[cfg(feature = "transparent")]
+                transparent: true,
+                #[cfg(feature = "transparent")]
+                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
                 resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
                 position: WindowPosition::Centered(MonitorSelection::Primary),
                 ..default()
