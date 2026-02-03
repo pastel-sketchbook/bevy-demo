@@ -2,13 +2,13 @@ use bevy::{
     app::AppExit,
     math::prelude::*,
     prelude::*,
-    window::{WindowPlugin, WindowResolution},
+    window::{WindowPlugin, WindowPosition, WindowResolution},
 };
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 // --- Constants ---
-const WINDOW_WIDTH: f32 = 1610.0;
-const WINDOW_HEIGHT: f32 = 1042.0;
+const WINDOW_WIDTH: f32 = 1606.0;
+const WINDOW_HEIGHT: f32 = 1036.0;
 const BACKGROUND_COLOR: Color = Color::srgba(0.07, 0.14, 0.04, 1.0);
 const RANDOM_SEED: u64 = 68941654987813521;
 const MIN_FIREFLIES: usize = 30;
@@ -35,22 +35,42 @@ const MAX_BLINK_SPEED: f32 = 2.0;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins.set(WindowPlugin {
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                // Remove window frame by setting borderless to true
                 decorations: false,
                 resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
+                position: WindowPosition::Centered(MonitorSelection::Primary),
                 ..default()
             }),
             ..default()
-        }),))
-        // set the global default clear color
+        }))
         // Changed ClearColor to an very dark greenish color
         .insert_resource(ClearColor(BACKGROUND_COLOR))
         .insert_resource(RandomSource(SmallRng::seed_from_u64(RANDOM_SEED)))
         .add_systems(Startup, setup)
-        .add_systems(Update, (move_firefly, firefly_blink, handle_keyboard_input))
+        .add_systems(
+            Update,
+            (
+                #[cfg(feature = "window-offset")]
+                offset_window,
+                move_firefly,
+                firefly_blink,
+                handle_keyboard_input,
+            ),
+        )
         .run();
+}
+
+#[cfg(feature = "window-offset")]
+fn offset_window(mut windows: Query<&mut Window>, mut done: Local<bool>) {
+    if *done {
+        return;
+    }
+    for mut window in windows.iter_mut() {
+        window.position = WindowPosition::At(IVec2::new(160, 88));
+        info!("Window positioned at: (160, 88)");
+        *done = true;
+    }
 }
 
 #[derive(Component)]

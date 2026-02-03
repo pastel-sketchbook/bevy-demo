@@ -1,8 +1,14 @@
 //! Bouncing shapes demo - demonstrates velocity-based movement, boundary collision, shape morphing.
 
-use bevy::{prelude::*, window::PrimaryWindow};
+use bevy::{
+    app::AppExit,
+    prelude::*,
+    window::{PrimaryWindow, WindowPlugin, WindowPosition, WindowResolution},
+};
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 
+const WINDOW_WIDTH: f32 = 1606.0;
+const WINDOW_HEIGHT: f32 = 1036.0;
 const SHAPE_COUNT: usize = 20;
 const MIN_SIZE: f32 = 15.0;
 const MAX_SIZE: f32 = 40.0;
@@ -10,13 +16,38 @@ const MIN_SPEED: f32 = 100.0;
 const MAX_SPEED: f32 = 300.0;
 const RANDOM_SEED: u64 = 42;
 const SHAPE_TYPES: usize = 5;
+const BACKGROUND_COLOR: Color = Color::srgb(0.08, 0.05, 0.15); // Dark purple
+
+#[cfg(feature = "window-offset")]
+fn offset_window(mut windows: Query<&mut Window>) {
+    for mut window in windows.iter_mut() {
+        window.position = WindowPosition::At(IVec2::new(160, 88));
+        info!("Window positioned at: (160, 88)");
+    }
+}
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
-        .insert_resource(ClearColor(Color::srgb(0.1, 0.1, 0.15)))
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                decorations: false,
+                resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
+                #[cfg(not(feature = "window-offset"))]
+                position: WindowPosition::Centered(MonitorSelection::Primary),
+                ..default()
+            }),
+            ..default()
+        }))
+        .insert_resource(ClearColor(BACKGROUND_COLOR))
         .insert_resource(RandomSource(SmallRng::seed_from_u64(RANDOM_SEED)))
-        .add_systems(Startup, setup)
+        .add_systems(
+            Startup,
+            (
+                #[cfg(feature = "window-offset")]
+                offset_window,
+                setup,
+            ),
+        )
         .add_systems(Update, (move_shapes, bounce_off_walls, handle_input))
         .run();
 }
@@ -199,7 +230,12 @@ fn handle_input(
     mut materials: ResMut<Assets<ColorMaterial>>,
     shape_meshes: Res<ShapeMeshes>,
     window: Query<&Window, With<PrimaryWindow>>,
+    mut app_exit: MessageWriter<AppExit>,
 ) {
+    if keyboard.pressed(KeyCode::KeyQ) {
+        app_exit.write(AppExit::Success);
+    }
+
     if keyboard.just_pressed(KeyCode::Space) {
         let Ok(window) = window.single() else {
             return;

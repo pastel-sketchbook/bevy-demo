@@ -1,18 +1,54 @@
 //! This example demonstrates how to use interpolation to make one entity smoothly follow another.
 
 use bevy::{
+    app::AppExit,
     math::{NormedVectorSpace, prelude::*, vec3},
     prelude::*,
+    window::{WindowPlugin, WindowPosition, WindowResolution},
 };
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 
+const WINDOW_WIDTH: f32 = 1606.0;
+const WINDOW_HEIGHT: f32 = 1036.0;
+const BACKGROUND_COLOR: Color = Color::srgb(0.12, 0.08, 0.06); // Dark brown/sepia
+
+#[cfg(feature = "window-offset")]
+fn offset_window(mut windows: Query<&mut Window>, mut done: Local<bool>) {
+    if *done {
+        return;
+    }
+    for mut window in windows.iter_mut() {
+        window.position = WindowPosition::At(IVec2::new(160, 88));
+        info!("Window positioned at: (160, 88)");
+        *done = true;
+    }
+}
+
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                decorations: false,
+                resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
+                position: WindowPosition::Centered(MonitorSelection::Primary),
+                ..default()
+            }),
+            ..default()
+        }))
         // set the global default clear color
-        .insert_resource(ClearColor(Color::srgba(0.95, 0.95, 1.0, 0.9)))
+        .insert_resource(ClearColor(BACKGROUND_COLOR))
         .add_systems(Startup, setup)
-        .add_systems(Update, (move_target, move_follower).chain())
+        .add_systems(
+            Update,
+            (
+                #[cfg(feature = "window-offset")]
+                offset_window,
+                move_target,
+                move_follower,
+                handle_quit,
+            )
+                .chain(),
+        )
         .run();
 }
 
@@ -131,4 +167,10 @@ fn move_follower(
     following
         .translation
         .smooth_nudge(&target.translation, decay_rate, delta_time);
+}
+
+fn handle_quit(keyboard: Res<ButtonInput<KeyCode>>, mut app_exit: MessageWriter<AppExit>) {
+    if keyboard.pressed(KeyCode::KeyQ) {
+        app_exit.write(AppExit::Success);
+    }
 }

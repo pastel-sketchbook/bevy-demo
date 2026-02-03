@@ -5,19 +5,34 @@ tasks:
   build:
     cmds:
       - cargo fmt
-      - cargo build --release
+      - cargo build --release --features window-offset
   run:
     cmds:
       - target/release/$PGM_NAME
-  run:firefly:
-    cmds:
-      - target/release/firefly
-  run:followings:
-    cmds:
-      - target/release/followings
   run:bouncing:
     cmds:
       - target/release/bouncing
+  run:firefly:
+    cmds:
+      - target/release/firefly
+  run:flocking:
+    cmds:
+      - target/release/flocking
+  run:followings:
+    cmds:
+      - target/release/followings
+  run:gravity:
+    cmds:
+      - target/release/gravity
+  run:particles:
+    cmds:
+      - target/release/particles
+  run:pong:
+    cmds:
+      - target/release/pong
+  run:sprites:
+    cmds:
+      - target/release/sprites
   install:
     deps: [build]
     cmds:
