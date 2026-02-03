@@ -4,8 +4,7 @@ use bevy::{
     math::{NormedVectorSpace, prelude::*, vec3},
     prelude::*,
 };
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaCha8Rng;
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 fn main() {
     App::new()
@@ -39,7 +38,7 @@ struct FollowingSphere;
 
 /// The source of randomness used by this example.
 #[derive(Resource)]
-struct RandomSource(ChaCha8Rng);
+struct RandomSource(SmallRng);
 
 fn setup(
     mut commands: Commands,
@@ -89,7 +88,7 @@ fn setup(
     commands.insert_resource(TargetSphereSpeed(5.0));
     commands.insert_resource(DecayRate(2.0));
     commands.insert_resource(TargetPosition(Vec3::ZERO));
-    commands.insert_resource(RandomSource(ChaCha8Rng::seed_from_u64(68941654987813521)));
+    commands.insert_resource(RandomSource(SmallRng::seed_from_u64(68941654987813521)));
 }
 
 fn move_target(

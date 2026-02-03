@@ -4,8 +4,7 @@ use bevy::{
     prelude::*,
     window::{WindowPlugin, WindowResolution},
 };
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaCha8Rng;
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 // --- Constants ---
 const WINDOW_WIDTH: f32 = 1610.0;
@@ -48,7 +47,7 @@ fn main() {
         // set the global default clear color
         // Changed ClearColor to an very dark greenish color
         .insert_resource(ClearColor(BACKGROUND_COLOR))
-        .insert_resource(RandomSource(ChaCha8Rng::seed_from_u64(RANDOM_SEED)))
+        .insert_resource(RandomSource(SmallRng::seed_from_u64(RANDOM_SEED)))
         .add_systems(Startup, setup)
         .add_systems(Update, (move_firefly, firefly_blink, handle_keyboard_input))
         .run();
@@ -64,7 +63,7 @@ struct FireflySpeed(f32);
 struct FireflyPosition(Vec3);
 
 #[derive(Resource)]
-struct RandomSource(ChaCha8Rng);
+struct RandomSource(SmallRng);
 
 #[derive(Component)]
 struct Blink {
