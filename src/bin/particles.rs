@@ -15,9 +15,10 @@ const WINDOW_WIDTH: f32 = 1606.0;
 const WINDOW_HEIGHT: f32 = 1036.0;
 const RANDOM_SEED: u64 = 12345678901234567;
 const SPAWN_RATE: f32 = 50.0; // particles per second
-const PARTICLE_LIFETIME: f32 = 2.0;
-const PARTICLE_SPEED: f32 = 150.0;
-const PARTICLE_SIZE: f32 = 8.0;
+const PARTICLE_LIFETIME: f32 = 5.0;
+const PARTICLE_SPEED: f32 = 300.0;
+const MIN_PARTICLE_SIZE: f32 = 4.0;
+const MAX_PARTICLE_SIZE: f32 = 16.0;
 
 #[cfg(feature = "transparent")]
 const BACKGROUND_COLOR: Color = Color::srgba(0.1, 0.02, 0.08, 0.3);
@@ -90,29 +91,18 @@ struct RandomSource(SmallRng);
 #[derive(Resource)]
 struct SpawnTimer(Timer);
 
-#[derive(Resource)]
-struct ParticleMesh(Handle<Mesh>);
-
-fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
+fn setup(mut commands: Commands) {
     commands.spawn(Camera2d);
-
-    let mesh = meshes.add(Circle::new(PARTICLE_SIZE));
-    commands.insert_resource(ParticleMesh(mesh));
 }
 
 fn spawn_particles(
     mut commands: Commands,
     mut rng: ResMut<RandomSource>,
     mut timer: ResMut<SpawnTimer>,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
-    particle_mesh: Res<ParticleMesh>,
     time: Res<Time>,
-    window: Query<&Window>,
 ) {
-    let Ok(window) = window.single() else {
-        return;
-    };
-
     timer.0.tick(time.delta());
 
     for _ in 0..timer.0.times_finished_this_tick() {
@@ -129,9 +119,9 @@ fn spawn_particles(
             .0
             .random_range(PARTICLE_LIFETIME * 0.5..PARTICLE_LIFETIME * 1.5);
 
+        let size = rng.0.random_range(MIN_PARTICLE_SIZE..MAX_PARTICLE_SIZE);
+        let mesh = meshes.add(Circle::new(size));
         let material = materials.add(ColorMaterial::from_color(color));
-
-        let _ = window; // acknowledge we have access to window for spawn position
 
         commands.spawn((
             Particle,
@@ -141,7 +131,7 @@ fn spawn_particles(
                 total: lifetime,
             },
             Transform::from_xyz(0.0, 0.0, 0.0),
-            Mesh2d(particle_mesh.0.clone()),
+            Mesh2d(mesh),
             MeshMaterial2d(material),
         ));
     }
