@@ -9,6 +9,15 @@ tasks:
   run:
     cmds:
       - target/release/$PGM_NAME
+  run:firefly:
+    cmds:
+      - target/release/firefly
+  run:followings:
+    cmds:
+      - target/release/followings
+  run:bouncing:
+    cmds:
+      - target/release/bouncing
   install:
     deps: [build]
     cmds:
