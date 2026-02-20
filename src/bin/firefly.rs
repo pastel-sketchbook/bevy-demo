@@ -6,7 +6,7 @@ use bevy::{
     prelude::*,
     window::{WindowPlugin, WindowPosition, WindowResolution},
 };
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 
 // --- Constants ---
 const WINDOW_WIDTH: f32 = 1606.0;

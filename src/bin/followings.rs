@@ -4,11 +4,11 @@
 use bevy::window::CompositeAlphaMode;
 use bevy::{
     app::AppExit,
-    math::{NormedVectorSpace, prelude::*, vec3},
+    math::{prelude::*, vec3, NormedVectorSpace},
     prelude::*,
     window::{WindowPlugin, WindowPosition, WindowResolution},
 };
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 
 const WINDOW_WIDTH: f32 = 1606.0;
 const WINDOW_HEIGHT: f32 = 1036.0;
