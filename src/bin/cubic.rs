@@ -1,7 +1,8 @@
 //! 3D rotating cube with the letters "PASTEL" on each face.
 //! Characters are rendered using an embedded 8x8 bitmap font drawn into textures.
 //! The cube rotates randomly with periodic axis/speed changes.
-//! A faint mirror reflection of the cube appears below, simulating a reflective surface.
+//! A faint mirror reflection appears below. Press `h`/`l` (vi-style) to toggle
+//! additional left/right reflection twins.
 
 #[cfg(feature = "transparent")]
 use bevy::window::CompositeAlphaMode;
@@ -37,6 +38,7 @@ const CAMERA_Y: f32 = 3.0;
 const CAMERA_Z: f32 = 5.0;
 const REFLECTION_ALPHA: f32 = 0.1;
 const CUBE_Y_OFFSET: f32 = 1.2;
+const CUBE_X_OFFSET: f32 = 3.0;
 
 // --- 8x8 Bitmap Font for A-Z ---
 // Each letter is 8 rows, each row is a u8 bitmask (MSB = leftmost pixel).
@@ -84,8 +86,17 @@ const FACE_BG_COLORS: [[u8; 3]; 6] = [
 #[derive(Component)]
 struct CubeRoot;
 
+/// Shared marker for all reflection roots (used by sync_reflection).
 #[derive(Component)]
-struct ReflectionRoot;
+struct Reflection;
+
+/// Left-side reflection twin, toggled with `h`.
+#[derive(Component)]
+struct LeftReflection;
+
+/// Right-side reflection twin, toggled with `l`.
+#[derive(Component)]
+struct RightReflection;
 
 #[derive(Component)]
 #[allow(dead_code)]
@@ -277,8 +288,8 @@ fn main() {
             (
                 #[cfg(feature = "window-offset")]
                 offset_window,
-                (rotate_cube, sync_reflection).chain(),
-                randomize_rotation,
+                (randomize_rotation, rotate_cube, sync_reflection).chain(),
+                toggle_side_reflections,
                 handle_quit,
             ),
         )
@@ -295,6 +306,37 @@ fn offset_window(mut windows: Query<&mut Window>, mut done: Local<bool>) {
         info!("Window positioned at: (160, 88)");
         *done = true;
     }
+}
+
+/// Spawn a reflection cube with the given root transform and visibility.
+/// Attaches 6 face children using shared material handles with transparent materials.
+fn spawn_reflection(
+    commands: &mut Commands,
+    face_mesh: &Handle<Mesh>,
+    reflection_materials: &[Handle<StandardMaterial>],
+    transforms: &[(Vec3, Quat); 6],
+    root_transform: Transform,
+    visibility: Visibility,
+) -> Entity {
+    let root = commands
+        .spawn((root_transform, visibility, Reflection))
+        .id();
+
+    for i in 0..6 {
+        let (translation, rotation) = transforms[i];
+        let face_entity = commands
+            .spawn((
+                Transform::from_translation(translation).with_rotation(rotation),
+                Visibility::Inherited,
+                Mesh3d(face_mesh.clone()),
+                MeshMaterial3d(reflection_materials[i].clone()),
+            ))
+            .id();
+
+        commands.entity(root).add_child(face_entity);
+    }
+
+    root
 }
 
 fn setup(
@@ -353,37 +395,52 @@ fn setup(
         commands.entity(cube_root).add_child(face_entity);
     }
 
-    // Spawn the reflection cube (Y-flipped below the mirror plane)
-    let reflection_root = commands
-        .spawn((
-            Transform::from_xyz(0.0, -CUBE_Y_OFFSET, 0.0).with_scale(Vec3::new(1.0, -1.0, 1.0)),
-            Visibility::Visible,
-            ReflectionRoot,
-        ))
-        .id();
+    // Create shared reflection materials (one per face, reused across all reflections)
+    let reflection_materials: Vec<Handle<StandardMaterial>> = face_image_handles
+        .iter()
+        .map(|image_handle| {
+            materials.add(StandardMaterial {
+                base_color: Color::srgba(1.0, 1.0, 1.0, REFLECTION_ALPHA),
+                base_color_texture: Some(image_handle.clone()),
+                unlit: true,
+                alpha_mode: AlphaMode::Blend,
+                double_sided: true,
+                ..default()
+            })
+        })
+        .collect();
 
-    for i in 0..6 {
-        let material = materials.add(StandardMaterial {
-            base_color: Color::srgba(1.0, 1.0, 1.0, REFLECTION_ALPHA),
-            base_color_texture: Some(face_image_handles[i].clone()),
-            unlit: true,
-            alpha_mode: AlphaMode::Blend,
-            double_sided: true, // needed because Y-flip reverses face winding
-            ..default()
-        });
+    // Bottom reflection (always visible, Y-flipped below the mirror plane)
+    spawn_reflection(
+        &mut commands,
+        &face_mesh,
+        &reflection_materials,
+        &transforms,
+        Transform::from_xyz(0.0, -CUBE_Y_OFFSET, 0.0).with_scale(Vec3::new(1.0, -1.0, 1.0)),
+        Visibility::Visible,
+    );
 
-        let (translation, rotation) = transforms[i];
-        let face_entity = commands
-            .spawn((
-                Transform::from_translation(translation).with_rotation(rotation),
-                Visibility::Visible,
-                Mesh3d(face_mesh.clone()),
-                MeshMaterial3d(material),
-            ))
-            .id();
+    // Left reflection twin (hidden, toggled with `h`, X-flipped)
+    let left = spawn_reflection(
+        &mut commands,
+        &face_mesh,
+        &reflection_materials,
+        &transforms,
+        Transform::from_xyz(-CUBE_X_OFFSET, 0.0, 0.0).with_scale(Vec3::new(-1.0, 1.0, 1.0)),
+        Visibility::Hidden,
+    );
+    commands.entity(left).insert(LeftReflection);
 
-        commands.entity(reflection_root).add_child(face_entity);
-    }
+    // Right reflection twin (hidden, toggled with `l`, X-flipped)
+    let right = spawn_reflection(
+        &mut commands,
+        &face_mesh,
+        &reflection_materials,
+        &transforms,
+        Transform::from_xyz(CUBE_X_OFFSET, 0.0, 0.0).with_scale(Vec3::new(-1.0, 1.0, 1.0)),
+        Visibility::Hidden,
+    );
+    commands.entity(right).insert(RightReflection);
 
     // Light
     commands.spawn((
@@ -430,18 +487,43 @@ fn randomize_rotation(
     }
 }
 
-/// Copy the main cube's rotation to the reflection so they rotate in sync.
+/// Copy the main cube's rotation to all reflection roots so they rotate in sync.
 fn sync_reflection(
-    cube_query: Query<&Transform, (With<CubeRoot>, Without<ReflectionRoot>)>,
-    mut reflection_query: Query<&mut Transform, (With<ReflectionRoot>, Without<CubeRoot>)>,
+    cube_query: Query<&Transform, (With<CubeRoot>, Without<Reflection>)>,
+    mut reflection_query: Query<&mut Transform, (With<Reflection>, Without<CubeRoot>)>,
 ) {
     let Ok(cube_transform) = cube_query.single() else {
         return;
     };
-    let Ok(mut reflection_transform) = reflection_query.single_mut() else {
-        return;
-    };
-    reflection_transform.rotation = cube_transform.rotation;
+    for mut reflection_transform in reflection_query.iter_mut() {
+        reflection_transform.rotation = cube_transform.rotation;
+    }
+}
+
+/// Toggle left/right reflection twins with vi-style `h`/`l` keys.
+fn toggle_side_reflections(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut left_query: Query<&mut Visibility, (With<LeftReflection>, Without<RightReflection>)>,
+    mut right_query: Query<&mut Visibility, (With<RightReflection>, Without<LeftReflection>)>,
+) {
+    if keyboard.just_pressed(KeyCode::KeyH) {
+        for mut vis in left_query.iter_mut() {
+            *vis = if *vis == Visibility::Hidden {
+                Visibility::Visible
+            } else {
+                Visibility::Hidden
+            };
+        }
+    }
+    if keyboard.just_pressed(KeyCode::KeyL) {
+        for mut vis in right_query.iter_mut() {
+            *vis = if *vis == Visibility::Hidden {
+                Visibility::Visible
+            } else {
+                Visibility::Hidden
+            };
+        }
+    }
 }
 
 fn handle_quit(keyboard: Res<ButtonInput<KeyCode>>, mut app_exit: MessageWriter<AppExit>) {
