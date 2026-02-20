@@ -12,6 +12,9 @@ tasks:
   run:bouncing:
     cmds:
       - target/release/bouncing
+  run:cubic:
+    cmds:
+      - target/release/cubic
   run:firefly:
     cmds:
       - target/release/firefly
