@@ -1,16 +1,17 @@
-//! 3D rotating cube with random alphabet characters on each face.
+//! 3D rotating cube with the letters "PASTEL" on each face.
 //! Characters are rendered using an embedded 8x8 bitmap font drawn into textures.
-//! The cube rotates randomly and characters update every 10 seconds with new pastel colors.
+//! The cube rotates randomly with periodic axis/speed changes.
 
 #[cfg(feature = "transparent")]
 use bevy::window::CompositeAlphaMode;
 use bevy::{
     app::AppExit,
+    asset::RenderAssetUsages,
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
     window::{WindowPlugin, WindowPosition, WindowResolution},
 };
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 
 // --- Constants ---
 const WINDOW_WIDTH: f32 = 1606.0;
@@ -24,10 +25,11 @@ const BACKGROUND_COLOR: Color = Color::srgb(0.08, 0.06, 0.12);
 const RANDOM_SEED: u64 = 72849156348927651;
 const CUBE_SIZE: f32 = 2.0;
 const TEXTURE_SIZE: u32 = 256;
-const CHAR_UPDATE_SECS: f32 = 10.0;
 const ROTATION_CHANGE_SECS: f32 = 5.0;
 const ROTATION_MIN_SPEED: f32 = 0.3;
 const ROTATION_MAX_SPEED: f32 = 1.5;
+// P=15, A=0, S=18, T=19, E=4, L=11
+const FACE_LETTERS: [usize; 6] = [15, 0, 18, 19, 4, 11];
 const LIGHT_INTENSITY: f32 = 15_000_000.0;
 const CAMERA_X: f32 = -3.0;
 const CAMERA_Y: f32 = 3.0;
@@ -95,13 +97,7 @@ struct RotationState {
 struct RandomSource(SmallRng);
 
 #[derive(Resource)]
-struct CharacterTimer(Timer);
-
-#[derive(Resource)]
 struct RotationTimer(Timer);
-
-#[derive(Resource)]
-struct FaceImages(Vec<Handle<Image>>);
 
 // --- Helper Functions ---
 
@@ -195,13 +191,8 @@ fn create_face_image() -> Image {
         TextureDimension::D2,
         &[128, 128, 128, 255],
         TextureFormat::Rgba8UnormSrgb,
-        default(),
+        RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
     )
-}
-
-/// Pick a random letter index (0-25).
-fn random_letter(rng: &mut SmallRng) -> usize {
-    rng.random_range(0..26)
 }
 
 /// Generate a random normalized axis.
@@ -270,10 +261,6 @@ fn main() {
         }))
         .insert_resource(ClearColor(BACKGROUND_COLOR))
         .insert_resource(RandomSource(SmallRng::seed_from_u64(RANDOM_SEED)))
-        .insert_resource(CharacterTimer(Timer::from_seconds(
-            CHAR_UPDATE_SECS,
-            TimerMode::Repeating,
-        )))
         .insert_resource(RotationTimer(Timer::from_seconds(
             ROTATION_CHANGE_SECS,
             TimerMode::Repeating,
@@ -285,7 +272,6 @@ fn main() {
                 #[cfg(feature = "window-offset")]
                 offset_window,
                 rotate_cube,
-                update_characters,
                 randomize_rotation,
                 handle_quit,
             ),
@@ -316,8 +302,6 @@ fn setup(
     let face_mesh = meshes.add(Plane3d::default().mesh().size(CUBE_SIZE, CUBE_SIZE));
     let transforms = face_transforms();
 
-    let mut face_image_handles = Vec::with_capacity(6);
-
     // Spawn the cube root entity
     let cube_root = commands
         .spawn((
@@ -334,13 +318,12 @@ fn setup(
     // Spawn 6 face entities as children
     for i in 0..6 {
         let mut image = create_face_image();
-        let letter = random_letter(rng);
+        let letter = FACE_LETTERS[i];
         let fg = random_pastel(rng);
         let bg = FACE_BG_COLORS[i];
         render_face(&mut image, letter, bg, fg);
 
         let image_handle = images.add(image);
-        face_image_handles.push(image_handle.clone());
 
         let material = materials.add(StandardMaterial {
             base_color_texture: Some(image_handle),
@@ -361,8 +344,6 @@ fn setup(
 
         commands.entity(cube_root).add_child(face_entity);
     }
-
-    commands.insert_resource(FaceImages(face_image_handles));
 
     // Light
     commands.spawn((
@@ -388,29 +369,6 @@ fn rotate_cube(
     for (mut transform, rotation) in query.iter_mut() {
         let angle = rotation.speed * time.delta_secs();
         transform.rotate(Quat::from_axis_angle(rotation.axis, angle));
-    }
-}
-
-fn update_characters(
-    mut timer: ResMut<CharacterTimer>,
-    time: Res<Time>,
-    mut images: ResMut<Assets<Image>>,
-    face_images: Res<FaceImages>,
-    mut rng_res: ResMut<RandomSource>,
-) {
-    timer.0.tick(time.delta());
-    if !timer.0.just_finished() {
-        return;
-    }
-
-    let rng = &mut rng_res.0;
-    for (i, handle) in face_images.0.iter().enumerate() {
-        if let Some(image) = images.get_mut(handle) {
-            let letter = random_letter(rng);
-            let fg = random_pastel(rng);
-            let bg = FACE_BG_COLORS[i % 6];
-            render_face(image, letter, bg, fg);
-        }
     }
 }
 
