@@ -1,6 +1,7 @@
 //! 3D rotating cube with the letters "PASTEL" on each face.
 //! Characters are rendered using an embedded 8x8 bitmap font drawn into textures.
 //! The cube rotates randomly with periodic axis/speed changes.
+//! A faint mirror reflection of the cube appears below, simulating a reflective surface.
 
 #[cfg(feature = "transparent")]
 use bevy::window::CompositeAlphaMode;
@@ -34,6 +35,8 @@ const LIGHT_INTENSITY: f32 = 15_000_000.0;
 const CAMERA_X: f32 = -3.0;
 const CAMERA_Y: f32 = 3.0;
 const CAMERA_Z: f32 = 5.0;
+const REFLECTION_ALPHA: f32 = 0.1;
+const CUBE_Y_OFFSET: f32 = 1.2;
 
 // --- 8x8 Bitmap Font for A-Z ---
 // Each letter is 8 rows, each row is a u8 bitmask (MSB = leftmost pixel).
@@ -80,6 +83,9 @@ const FACE_BG_COLORS: [[u8; 3]; 6] = [
 
 #[derive(Component)]
 struct CubeRoot;
+
+#[derive(Component)]
+struct ReflectionRoot;
 
 #[derive(Component)]
 #[allow(dead_code)]
@@ -271,7 +277,7 @@ fn main() {
             (
                 #[cfg(feature = "window-offset")]
                 offset_window,
-                rotate_cube,
+                (rotate_cube, sync_reflection).chain(),
                 randomize_rotation,
                 handle_quit,
             ),
@@ -302,10 +308,10 @@ fn setup(
     let face_mesh = meshes.add(Plane3d::default().mesh().size(CUBE_SIZE, CUBE_SIZE));
     let transforms = face_transforms();
 
-    // Spawn the cube root entity
+    // Spawn the cube root entity (positioned above the mirror plane)
     let cube_root = commands
         .spawn((
-            Transform::default(),
+            Transform::from_xyz(0.0, CUBE_Y_OFFSET, 0.0),
             Visibility::Visible,
             CubeRoot,
             RotationState {
@@ -315,7 +321,8 @@ fn setup(
         ))
         .id();
 
-    // Spawn 6 face entities as children
+    // Spawn 6 face entities as children, collecting image handles for the reflection
+    let mut face_image_handles = Vec::with_capacity(6);
     for i in 0..6 {
         let mut image = create_face_image();
         let letter = FACE_LETTERS[i];
@@ -324,6 +331,7 @@ fn setup(
         render_face(&mut image, letter, bg, fg);
 
         let image_handle = images.add(image);
+        face_image_handles.push(image_handle.clone());
 
         let material = materials.add(StandardMaterial {
             base_color_texture: Some(image_handle),
@@ -343,6 +351,38 @@ fn setup(
             .id();
 
         commands.entity(cube_root).add_child(face_entity);
+    }
+
+    // Spawn the reflection cube (Y-flipped below the mirror plane)
+    let reflection_root = commands
+        .spawn((
+            Transform::from_xyz(0.0, -CUBE_Y_OFFSET, 0.0).with_scale(Vec3::new(1.0, -1.0, 1.0)),
+            Visibility::Visible,
+            ReflectionRoot,
+        ))
+        .id();
+
+    for i in 0..6 {
+        let material = materials.add(StandardMaterial {
+            base_color: Color::srgba(1.0, 1.0, 1.0, REFLECTION_ALPHA),
+            base_color_texture: Some(face_image_handles[i].clone()),
+            unlit: true,
+            alpha_mode: AlphaMode::Blend,
+            double_sided: true, // needed because Y-flip reverses face winding
+            ..default()
+        });
+
+        let (translation, rotation) = transforms[i];
+        let face_entity = commands
+            .spawn((
+                Transform::from_translation(translation).with_rotation(rotation),
+                Visibility::Visible,
+                Mesh3d(face_mesh.clone()),
+                MeshMaterial3d(material),
+            ))
+            .id();
+
+        commands.entity(reflection_root).add_child(face_entity);
     }
 
     // Light
@@ -388,6 +428,20 @@ fn randomize_rotation(
         rotation.axis = random_axis(rng);
         rotation.speed = rng.random_range(ROTATION_MIN_SPEED..ROTATION_MAX_SPEED);
     }
+}
+
+/// Copy the main cube's rotation to the reflection so they rotate in sync.
+fn sync_reflection(
+    cube_query: Query<&Transform, (With<CubeRoot>, Without<ReflectionRoot>)>,
+    mut reflection_query: Query<&mut Transform, (With<ReflectionRoot>, Without<CubeRoot>)>,
+) {
+    let Ok(cube_transform) = cube_query.single() else {
+        return;
+    };
+    let Ok(mut reflection_transform) = reflection_query.single_mut() else {
+        return;
+    };
+    reflection_transform.rotation = cube_transform.rotation;
 }
 
 fn handle_quit(keyboard: Res<ButtonInput<KeyCode>>, mut app_exit: MessageWriter<AppExit>) {
