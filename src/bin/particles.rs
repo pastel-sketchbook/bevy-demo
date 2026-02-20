@@ -2,17 +2,9 @@
 //!
 //! Demonstrates continuous particle spawning with velocity, lifetime, and fade-out.
 
-#[cfg(feature = "transparent")]
-use bevy::window::CompositeAlphaMode;
-use bevy::{
-    app::AppExit,
-    prelude::*,
-    window::{Window, WindowPlugin, WindowPosition, WindowResolution},
-};
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use bevy_demo::*;
 
-const WINDOW_WIDTH: f32 = 1606.0;
-const WINDOW_HEIGHT: f32 = 1036.0;
+const BACKGROUND_COLOR: Color = background_color(0.1, 0.02, 0.08, 0.3);
 const RANDOM_SEED: u64 = 12345678901234567;
 const SPAWN_RATE: f32 = 50.0; // particles per second
 const PARTICLE_LIFETIME: f32 = 5.0;
@@ -20,24 +12,10 @@ const PARTICLE_SPEED: f32 = 300.0;
 const MIN_PARTICLE_SIZE: f32 = 4.0;
 const MAX_PARTICLE_SIZE: f32 = 16.0;
 
-#[cfg(feature = "transparent")]
-const BACKGROUND_COLOR: Color = Color::srgba(0.1, 0.02, 0.08, 0.3);
-#[cfg(not(feature = "transparent"))]
-const BACKGROUND_COLOR: Color = Color::srgb(0.1, 0.02, 0.08); // Dark magenta
-
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                decorations: false,
-                #[cfg(feature = "transparent")]
-                transparent: true,
-                #[cfg(feature = "transparent")]
-                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
-                resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
-                position: WindowPosition::Centered(MonitorSelection::Primary),
-                ..default()
-            }),
+            primary_window: Some(default_window()),
             ..default()
         }))
         .insert_resource(ClearColor(BACKGROUND_COLOR))
@@ -61,32 +39,14 @@ fn main() {
         .run();
 }
 
-#[cfg(feature = "window-offset")]
-fn offset_window(mut windows: Query<&mut Window>, mut done: Local<bool>) {
-    if *done {
-        return;
-    }
-    for mut window in windows.iter_mut() {
-        window.position = WindowPosition::At(IVec2::new(160, 88));
-        info!("Window positioned at: (160, 88)");
-        *done = true;
-    }
-}
-
 #[derive(Component)]
 struct Particle;
-
-#[derive(Component)]
-struct Velocity(Vec2);
 
 #[derive(Component)]
 struct Lifetime {
     remaining: f32,
     total: f32,
 }
-
-#[derive(Resource)]
-struct RandomSource(SmallRng);
 
 #[derive(Resource)]
 struct SpawnTimer(Timer);
@@ -157,16 +117,15 @@ fn update_particles(
 
         let alpha = (lifetime.remaining / lifetime.total).clamp(0.0, 1.0);
 
-        if let Some(material) = materials.get_mut(&material_handle.0) {
-            if let Color::Hsla(Hsla {
+        if let Some(material) = materials.get_mut(&material_handle.0)
+            && let Color::Hsla(Hsla {
                 hue,
                 saturation,
                 lightness,
                 ..
             }) = material.color
-            {
-                material.color = Color::hsla(hue, saturation, lightness, alpha);
-            }
+        {
+            material.color = Color::hsla(hue, saturation, lightness, alpha);
         }
     }
 }
@@ -176,11 +135,5 @@ fn despawn_particles(mut commands: Commands, query: Query<(Entity, &Lifetime), W
         if lifetime.remaining <= 0.0 {
             commands.entity(entity).despawn();
         }
-    }
-}
-
-fn handle_quit(keyboard: Res<ButtonInput<KeyCode>>, mut app_exit: MessageWriter<AppExit>) {
-    if keyboard.pressed(KeyCode::KeyQ) {
-        app_exit.write(AppExit::Success);
     }
 }

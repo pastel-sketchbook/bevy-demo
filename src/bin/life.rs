@@ -2,20 +2,15 @@
 //! Left-click to paint cells, right-click to erase. Space to pause/resume,
 //! R to randomize, C to clear. Simulation runs in FixedUpdate at ~10Hz.
 
-#[cfg(feature = "transparent")]
-use bevy::window::CompositeAlphaMode;
 use bevy::{
-    app::AppExit,
     asset::RenderAssetUsages,
-    prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
-    window::{PrimaryWindow, WindowPlugin, WindowPosition, WindowResolution},
 };
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use bevy_demo::*;
 
 // --- Constants ---
-const WINDOW_WIDTH: f32 = 1606.0;
-const WINDOW_HEIGHT: f32 = 1036.0;
+
+const BACKGROUND_COLOR: Color = background_color(0.05, 0.05, 0.1, 0.3);
 const RANDOM_SEED: u64 = 98765432101234567;
 
 const GRID_WIDTH: usize = 320;
@@ -25,20 +20,12 @@ const CELL_DEAD_COLOR: [u8; 4] = [42, 40, 52, 255]; // Pastel charcoal
 const SIMULATION_HZ: f64 = 10.0;
 const BRUSH_RADIUS: i32 = 2;
 
-#[cfg(feature = "transparent")]
-const BACKGROUND_COLOR: Color = Color::srgba(0.05, 0.05, 0.1, 0.3);
-#[cfg(not(feature = "transparent"))]
-const BACKGROUND_COLOR: Color = Color::srgb(0.05, 0.05, 0.1);
-
 // --- Components ---
 
 #[derive(Component)]
 struct GridSprite;
 
 // --- Resources ---
-
-#[derive(Resource)]
-struct RandomSource(SmallRng);
 
 #[derive(Resource)]
 struct LifeGrid {
@@ -126,31 +113,10 @@ struct GridImageHandle(Handle<Image>);
 
 // --- Main ---
 
-#[cfg(feature = "window-offset")]
-fn offset_window(mut windows: Query<&mut Window>, mut done: Local<bool>) {
-    if *done {
-        return;
-    }
-    for mut window in windows.iter_mut() {
-        window.position = WindowPosition::At(IVec2::new(160, 88));
-        info!("Window positioned at: (160, 88)");
-        *done = true;
-    }
-}
-
 fn main() {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
-        primary_window: Some(Window {
-            decorations: false,
-            #[cfg(feature = "transparent")]
-            transparent: true,
-            #[cfg(feature = "transparent")]
-            composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
-            resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
-            position: WindowPosition::Centered(MonitorSelection::Primary),
-            ..default()
-        }),
+        primary_window: Some(default_window()),
         ..default()
     }))
     .insert_resource(ClearColor(BACKGROUND_COLOR))
@@ -297,11 +263,5 @@ fn render_grid(
             data[idx + 2] = color[2];
             data[idx + 3] = color[3];
         }
-    }
-}
-
-fn handle_quit(keyboard: Res<ButtonInput<KeyCode>>, mut app_exit: MessageWriter<AppExit>) {
-    if keyboard.pressed(KeyCode::KeyQ) {
-        app_exit.write(AppExit::Success);
     }
 }

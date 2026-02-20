@@ -1,16 +1,7 @@
 //! Bouncing shapes demo - demonstrates velocity-based movement, boundary collision, shape morphing.
 
-#[cfg(feature = "transparent")]
-use bevy::window::CompositeAlphaMode;
-use bevy::{
-    app::AppExit,
-    prelude::*,
-    window::{PrimaryWindow, WindowPlugin, WindowPosition, WindowResolution},
-};
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use bevy_demo::*;
 
-const WINDOW_WIDTH: f32 = 1606.0;
-const WINDOW_HEIGHT: f32 = 1036.0;
 const SHAPE_COUNT: usize = 20;
 const MIN_SIZE: f32 = 15.0;
 const MAX_SIZE: f32 = 40.0;
@@ -19,46 +10,27 @@ const MAX_SPEED: f32 = 300.0;
 const RANDOM_SEED: u64 = 42;
 const SHAPE_TYPES: usize = 5;
 
-#[cfg(feature = "transparent")]
-const BACKGROUND_COLOR: Color = Color::srgba(0.08, 0.05, 0.15, 0.3);
-#[cfg(not(feature = "transparent"))]
-const BACKGROUND_COLOR: Color = Color::srgb(0.08, 0.05, 0.15); // Dark purple
-
-#[cfg(feature = "window-offset")]
-fn offset_window(mut windows: Query<&mut Window>) {
-    for mut window in windows.iter_mut() {
-        window.position = WindowPosition::At(IVec2::new(160, 88));
-        info!("Window positioned at: (160, 88)");
-    }
-}
+const BACKGROUND_COLOR: Color = background_color(0.08, 0.05, 0.15, 0.3);
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                decorations: false,
-                #[cfg(feature = "transparent")]
-                transparent: true,
-                #[cfg(feature = "transparent")]
-                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
-                resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
-                #[cfg(not(feature = "window-offset"))]
-                position: WindowPosition::Centered(MonitorSelection::Primary),
-                ..default()
-            }),
+            primary_window: Some(default_window()),
             ..default()
         }))
         .insert_resource(ClearColor(BACKGROUND_COLOR))
         .insert_resource(RandomSource(SmallRng::seed_from_u64(RANDOM_SEED)))
+        .add_systems(Startup, setup)
         .add_systems(
-            Startup,
+            Update,
             (
                 #[cfg(feature = "window-offset")]
                 offset_window,
-                setup,
+                move_shapes,
+                bounce_off_walls,
+                handle_input,
             ),
         )
-        .add_systems(Update, (move_shapes, bounce_off_walls, handle_input))
         .run();
 }
 
@@ -66,13 +38,7 @@ fn main() {
 struct Shape;
 
 #[derive(Component)]
-struct Velocity(Vec2);
-
-#[derive(Component)]
 struct Size(f32);
-
-#[derive(Resource)]
-struct RandomSource(SmallRng);
 
 #[derive(Resource)]
 struct ShapeMeshes {

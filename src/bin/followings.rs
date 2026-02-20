@@ -1,48 +1,14 @@
 //! This example demonstrates how to use interpolation to make one entity smoothly follow another.
 
-#[cfg(feature = "transparent")]
-use bevy::window::CompositeAlphaMode;
-use bevy::{
-    app::AppExit,
-    math::{NormedVectorSpace, prelude::*, vec3},
-    prelude::*,
-    window::{WindowPlugin, WindowPosition, WindowResolution},
-};
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use bevy::math::{NormedVectorSpace, vec3};
+use bevy_demo::*;
 
-const WINDOW_WIDTH: f32 = 1606.0;
-const WINDOW_HEIGHT: f32 = 1036.0;
-
-#[cfg(feature = "transparent")]
-const BACKGROUND_COLOR: Color = Color::srgba(0.12, 0.08, 0.06, 0.3); // Semi-transparent
-#[cfg(not(feature = "transparent"))]
-const BACKGROUND_COLOR: Color = Color::srgb(0.12, 0.08, 0.06); // Opaque
-
-#[cfg(feature = "window-offset")]
-fn offset_window(mut windows: Query<&mut Window>, mut done: Local<bool>) {
-    if *done {
-        return;
-    }
-    for mut window in windows.iter_mut() {
-        window.position = WindowPosition::At(IVec2::new(160, 88));
-        info!("Window positioned at: (160, 88)");
-        *done = true;
-    }
-}
+const BACKGROUND_COLOR: Color = background_color(0.12, 0.08, 0.06, 0.3);
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                decorations: false,
-                #[cfg(feature = "transparent")]
-                transparent: true,
-                #[cfg(feature = "transparent")]
-                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
-                resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
-                position: WindowPosition::Centered(MonitorSelection::Primary),
-                ..default()
-            }),
+            primary_window: Some(default_window()),
             ..default()
         }))
         // set the global default clear color
@@ -81,10 +47,6 @@ struct DecayRate(f32);
 // The sphere that follows the target sphere by moving towards it with nudging:
 #[derive(Component)]
 struct FollowingSphere;
-
-/// The source of randomness used by this example.
-#[derive(Resource)]
-struct RandomSource(SmallRng);
 
 fn setup(
     mut commands: Commands,
@@ -177,10 +139,4 @@ fn move_follower(
     following
         .translation
         .smooth_nudge(&target.translation, decay_rate, delta_time);
-}
-
-fn handle_quit(keyboard: Res<ButtonInput<KeyCode>>, mut app_exit: MessageWriter<AppExit>) {
-    if keyboard.pressed(KeyCode::KeyQ) {
-        app_exit.write(AppExit::Success);
-    }
 }

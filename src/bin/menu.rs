@@ -1,25 +1,14 @@
-//! State machine demo: Menu → Playing → Paused → GameOver.
+//! State machine demo: Menu -> Playing -> Paused -> GameOver.
 //! A simple "press Space to score" game with a 10-second countdown.
 //! Demonstrates States, UI with Node/Text/Button/Interaction, generic cleanup.
 
 #![allow(clippy::type_complexity)]
 
-#[cfg(feature = "transparent")]
-use bevy::window::CompositeAlphaMode;
-use bevy::{
-    app::AppExit,
-    prelude::*,
-    window::{WindowPlugin, WindowPosition, WindowResolution},
-};
+use bevy_demo::*;
 
 // --- Constants ---
-const WINDOW_WIDTH: f32 = 1606.0;
-const WINDOW_HEIGHT: f32 = 1036.0;
 
-#[cfg(feature = "transparent")]
-const BACKGROUND_COLOR: Color = Color::srgba(0.08, 0.05, 0.12, 0.3);
-#[cfg(not(feature = "transparent"))]
-const BACKGROUND_COLOR: Color = Color::srgb(0.08, 0.05, 0.12);
+const BACKGROUND_COLOR: Color = background_color(0.08, 0.05, 0.12, 0.3);
 
 const GAME_DURATION: f32 = 10.0;
 const BUTTON_COLOR: Color = Color::srgb(0.2, 0.2, 0.35);
@@ -76,31 +65,10 @@ struct GameTimer(Timer);
 
 // --- Main ---
 
-#[cfg(feature = "window-offset")]
-fn offset_window(mut windows: Query<&mut Window>, mut done: Local<bool>) {
-    if *done {
-        return;
-    }
-    for mut window in windows.iter_mut() {
-        window.position = WindowPosition::At(IVec2::new(160, 88));
-        info!("Window positioned at: (160, 88)");
-        *done = true;
-    }
-}
-
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                decorations: false,
-                #[cfg(feature = "transparent")]
-                transparent: true,
-                #[cfg(feature = "transparent")]
-                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
-                resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
-                position: WindowPosition::Centered(MonitorSelection::Primary),
-                ..default()
-            }),
+            primary_window: Some(default_window()),
             ..default()
         }))
         .insert_resource(ClearColor(BACKGROUND_COLOR))
@@ -528,11 +496,5 @@ fn game_over_button_colors(
             Interaction::Hovered => BackgroundColor(BUTTON_HOVER_COLOR),
             Interaction::None => BackgroundColor(BUTTON_COLOR),
         };
-    }
-}
-
-fn handle_quit(keyboard: Res<ButtonInput<KeyCode>>, mut app_exit: MessageWriter<AppExit>) {
-    if keyboard.pressed(KeyCode::KeyQ) {
-        app_exit.write(AppExit::Success);
     }
 }

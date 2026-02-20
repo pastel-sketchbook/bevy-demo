@@ -1,23 +1,11 @@
 //! Gravitational attraction simulation with a sun and orbiting planets.
 //! Press Space to add a new random planet.
 
-#[cfg(feature = "transparent")]
-use bevy::window::CompositeAlphaMode;
-use bevy::{
-    app::AppExit,
-    prelude::*,
-    window::{WindowPlugin, WindowPosition, WindowResolution},
-};
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use bevy_demo::*;
 
-const WINDOW_WIDTH: f32 = 1606.0;
-const WINDOW_HEIGHT: f32 = 1036.0;
 const RANDOM_SEED: u64 = 42;
 
-#[cfg(feature = "transparent")]
-const BACKGROUND_COLOR: Color = Color::srgba(0.01, 0.01, 0.03, 0.3);
-#[cfg(not(feature = "transparent"))]
-const BACKGROUND_COLOR: Color = Color::srgb(0.01, 0.01, 0.03); // Near black (space)
+const BACKGROUND_COLOR: Color = background_color(0.01, 0.01, 0.03, 0.3);
 
 const SUN_MASS: f32 = 1000.0;
 const SUN_RADIUS: f32 = 30.0;
@@ -28,31 +16,10 @@ const INITIAL_PLANETS: usize = 5;
 const MIN_ORBIT_RADIUS: f32 = 100.0;
 const MAX_ORBIT_RADIUS: f32 = 350.0;
 
-#[cfg(feature = "window-offset")]
-fn offset_window(mut windows: Query<&mut Window>, mut done: Local<bool>) {
-    if *done {
-        return;
-    }
-    for mut window in windows.iter_mut() {
-        window.position = WindowPosition::At(IVec2::new(160, 88));
-        info!("Window positioned at: (160, 88)");
-        *done = true;
-    }
-}
-
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                decorations: false,
-                #[cfg(feature = "transparent")]
-                transparent: true,
-                #[cfg(feature = "transparent")]
-                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
-                resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
-                position: WindowPosition::Centered(MonitorSelection::Primary),
-                ..default()
-            }),
+            primary_window: Some(default_window()),
             ..default()
         }))
         .insert_resource(ClearColor(BACKGROUND_COLOR))
@@ -80,12 +47,6 @@ struct Planet;
 
 #[derive(Component)]
 struct Mass(f32);
-
-#[derive(Component)]
-struct Velocity(Vec2);
-
-#[derive(Resource)]
-struct RandomSource(SmallRng);
 
 fn setup(
     mut commands: Commands,

@@ -1,21 +1,8 @@
-#[cfg(feature = "transparent")]
-use bevy::window::CompositeAlphaMode;
-use bevy::{
-    app::AppExit,
-    math::prelude::*,
-    prelude::*,
-    window::{WindowPlugin, WindowPosition, WindowResolution},
-};
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use bevy_demo::*;
 
 // --- Constants ---
-const WINDOW_WIDTH: f32 = 1606.0;
-const WINDOW_HEIGHT: f32 = 1036.0;
 
-#[cfg(feature = "transparent")]
-const BACKGROUND_COLOR: Color = Color::srgba(0.07, 0.14, 0.04, 0.3);
-#[cfg(not(feature = "transparent"))]
-const BACKGROUND_COLOR: Color = Color::srgb(0.07, 0.14, 0.04);
+const BACKGROUND_COLOR: Color = background_color(0.07, 0.14, 0.04, 0.3);
 const RANDOM_SEED: u64 = 68941654987813521;
 const MIN_FIREFLIES: usize = 30;
 const MAX_FIREFLIES: usize = 70;
@@ -42,16 +29,7 @@ const MAX_BLINK_SPEED: f32 = 2.0;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                decorations: false,
-                #[cfg(feature = "transparent")]
-                transparent: true,
-                #[cfg(feature = "transparent")]
-                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
-                resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
-                position: WindowPosition::Centered(MonitorSelection::Primary),
-                ..default()
-            }),
+            primary_window: Some(default_window()),
             ..default()
         }))
         // Changed ClearColor to an very dark greenish color
@@ -71,18 +49,6 @@ fn main() {
         .run();
 }
 
-#[cfg(feature = "window-offset")]
-fn offset_window(mut windows: Query<&mut Window>, mut done: Local<bool>) {
-    if *done {
-        return;
-    }
-    for mut window in windows.iter_mut() {
-        window.position = WindowPosition::At(IVec2::new(160, 88));
-        info!("Window positioned at: (160, 88)");
-        *done = true;
-    }
-}
-
 #[derive(Component)]
 struct Firefly;
 
@@ -91,9 +57,6 @@ struct FireflySpeed(f32);
 
 #[derive(Component)]
 struct FireflyPosition(Vec3);
-
-#[derive(Resource)]
-struct RandomSource(SmallRng);
 
 #[derive(Component)]
 struct Blink {

@@ -6,36 +6,12 @@
 //! - Arrow key movement
 //! - No external assets required
 
-#[cfg(feature = "transparent")]
-use bevy::window::CompositeAlphaMode;
-use bevy::{
-    app::AppExit,
-    prelude::*,
-    window::{WindowPlugin, WindowPosition, WindowResolution},
-};
+use bevy_demo::*;
 
-const WINDOW_WIDTH: f32 = 1606.0;
-const WINDOW_HEIGHT: f32 = 1036.0;
+const BACKGROUND_COLOR: Color = background_color(0.03, 0.1, 0.1, 0.3);
 const SPRITE_SIZE: f32 = 64.0;
 const MOVE_SPEED: f32 = 300.0;
 const FRAME_DURATION: f32 = 0.15;
-
-#[cfg(feature = "transparent")]
-const BACKGROUND_COLOR: Color = Color::srgba(0.03, 0.1, 0.1, 0.3);
-#[cfg(not(feature = "transparent"))]
-const BACKGROUND_COLOR: Color = Color::srgb(0.03, 0.1, 0.1);
-
-#[cfg(feature = "window-offset")]
-fn offset_window(mut windows: Query<&mut Window>, mut done: Local<bool>) {
-    if *done {
-        return;
-    }
-    for mut window in windows.iter_mut() {
-        window.position = WindowPosition::At(IVec2::new(160, 88));
-        info!("Window positioned at: (160, 88)");
-        *done = true;
-    }
-}
 
 const ANIMATION_COLORS: [Color; 6] = [
     Color::srgb(1.0, 0.2, 0.2), // Red
@@ -49,16 +25,7 @@ const ANIMATION_COLORS: [Color; 6] = [
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                decorations: false,
-                #[cfg(feature = "transparent")]
-                transparent: true,
-                #[cfg(feature = "transparent")]
-                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
-                resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
-                position: WindowPosition::Centered(MonitorSelection::Primary),
-                ..default()
-            }),
+            primary_window: Some(default_window()),
             ..default()
         }))
         .insert_resource(ClearColor(BACKGROUND_COLOR))
@@ -153,6 +120,7 @@ fn move_sprite(
     }
 }
 
+/// Custom quit handler: Escape or Q to exit.
 fn handle_input(keyboard: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>) {
     if keyboard.just_pressed(KeyCode::Escape) || keyboard.just_pressed(KeyCode::KeyQ) {
         exit.write(AppExit::Success);

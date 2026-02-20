@@ -1,23 +1,12 @@
 //! 3D camera orbit controller demo. Left-drag to orbit around the scene,
 //! scroll to zoom in/out. Several auto-rotating 3D primitives are displayed.
 
-#[cfg(feature = "transparent")]
-use bevy::window::CompositeAlphaMode;
-use bevy::{
-    app::AppExit,
-    input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll},
-    prelude::*,
-    window::{WindowPlugin, WindowPosition, WindowResolution},
-};
+use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
+use bevy_demo::*;
 
 // --- Constants ---
-const WINDOW_WIDTH: f32 = 1606.0;
-const WINDOW_HEIGHT: f32 = 1036.0;
 
-#[cfg(feature = "transparent")]
-const BACKGROUND_COLOR: Color = Color::srgba(0.06, 0.06, 0.1, 0.3);
-#[cfg(not(feature = "transparent"))]
-const BACKGROUND_COLOR: Color = Color::srgb(0.06, 0.06, 0.1);
+const BACKGROUND_COLOR: Color = background_color(0.06, 0.06, 0.1, 0.3);
 
 const ORBIT_SENSITIVITY: f32 = 0.005;
 const ZOOM_SENSITIVITY: f32 = 0.5;
@@ -46,31 +35,10 @@ struct AutoRotate {
 
 // --- Main ---
 
-#[cfg(feature = "window-offset")]
-fn offset_window(mut windows: Query<&mut Window>, mut done: Local<bool>) {
-    if *done {
-        return;
-    }
-    for mut window in windows.iter_mut() {
-        window.position = WindowPosition::At(IVec2::new(160, 88));
-        info!("Window positioned at: (160, 88)");
-        *done = true;
-    }
-}
-
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                decorations: false,
-                #[cfg(feature = "transparent")]
-                transparent: true,
-                #[cfg(feature = "transparent")]
-                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
-                resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
-                position: WindowPosition::Centered(MonitorSelection::Primary),
-                ..default()
-            }),
+            primary_window: Some(default_window()),
             ..default()
         }))
         .insert_resource(ClearColor(BACKGROUND_COLOR))
@@ -220,11 +188,5 @@ fn auto_rotate(mut query: Query<(&mut Transform, &AutoRotate)>, time: Res<Time>)
     for (mut transform, rotate) in query.iter_mut() {
         let angle = rotate.speed * time.delta_secs();
         transform.rotate(Quat::from_axis_angle(rotate.axis, angle));
-    }
-}
-
-fn handle_quit(keyboard: Res<ButtonInput<KeyCode>>, mut app_exit: MessageWriter<AppExit>) {
-    if keyboard.pressed(KeyCode::KeyQ) {
-        app_exit.write(AppExit::Success);
     }
 }

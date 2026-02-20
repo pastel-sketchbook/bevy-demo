@@ -2,24 +2,12 @@
 //! post-processing component, Hdr marker, and emissive StandardMaterials with
 //! intensity values greater than 1.0. Shapes pulse their emissive glow.
 
-#[cfg(feature = "transparent")]
-use bevy::window::CompositeAlphaMode;
-use bevy::{
-    app::AppExit,
-    post_process::bloom::Bloom,
-    prelude::*,
-    render::view::Hdr,
-    window::{WindowPlugin, WindowPosition, WindowResolution},
-};
+use bevy::{post_process::bloom::Bloom, render::view::Hdr};
+use bevy_demo::*;
 
 // --- Constants ---
-const WINDOW_WIDTH: f32 = 1606.0;
-const WINDOW_HEIGHT: f32 = 1036.0;
 
-#[cfg(feature = "transparent")]
-const BACKGROUND_COLOR: Color = Color::srgba(0.01, 0.01, 0.02, 0.3);
-#[cfg(not(feature = "transparent"))]
-const BACKGROUND_COLOR: Color = Color::srgb(0.01, 0.01, 0.02);
+const BACKGROUND_COLOR: Color = background_color(0.01, 0.01, 0.02, 0.3);
 
 const LIGHT_INTENSITY: f32 = 500_000.0;
 const PULSE_SPEED: f32 = 2.0;
@@ -47,31 +35,10 @@ struct OrbitObject {
 
 // --- Main ---
 
-#[cfg(feature = "window-offset")]
-fn offset_window(mut windows: Query<&mut Window>, mut done: Local<bool>) {
-    if *done {
-        return;
-    }
-    for mut window in windows.iter_mut() {
-        window.position = WindowPosition::At(IVec2::new(160, 88));
-        info!("Window positioned at: (160, 88)");
-        *done = true;
-    }
-}
-
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                decorations: false,
-                #[cfg(feature = "transparent")]
-                transparent: true,
-                #[cfg(feature = "transparent")]
-                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
-                resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
-                position: WindowPosition::Centered(MonitorSelection::Primary),
-                ..default()
-            }),
+            primary_window: Some(default_window()),
             ..default()
         }))
         .insert_resource(ClearColor(BACKGROUND_COLOR))
@@ -244,11 +211,5 @@ fn orbit_objects(time: Res<Time>, mut query: Query<(&mut Transform, &OrbitObject
         transform.translation.y = orbit.height;
         // Gentle bobbing
         transform.translation.y += (t * 0.8 + orbit.phase).sin() * 0.3;
-    }
-}
-
-fn handle_quit(keyboard: Res<ButtonInput<KeyCode>>, mut app_exit: MessageWriter<AppExit>) {
-    if keyboard.pressed(KeyCode::KeyQ) {
-        app_exit.write(AppExit::Success);
     }
 }

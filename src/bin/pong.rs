@@ -1,17 +1,12 @@
 //! Classic Pong game demonstrating 2D rendering with Mesh2d, collision detection, and scoring.
 
-#[cfg(feature = "transparent")]
-use bevy::window::CompositeAlphaMode;
-use bevy::{
-    app::AppExit,
-    prelude::*,
-    window::{WindowPlugin, WindowPosition, WindowResolution},
-};
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+#![allow(clippy::type_complexity, clippy::too_many_arguments)]
+
+use bevy_demo::*;
 
 // --- Constants ---
-const WINDOW_WIDTH: f32 = 1606.0;
-const WINDOW_HEIGHT: f32 = 1036.0;
+
+const BACKGROUND_COLOR: Color = background_color(0.0, 0.08, 0.04, 0.3);
 const PADDLE_WIDTH: f32 = 15.0;
 const PADDLE_HEIGHT: f32 = 160.0;
 const PADDLE_SPEED: f32 = 400.0;
@@ -24,36 +19,10 @@ const BALL_COLOR: Color = Color::srgb(1.0, 1.0, 0.0);
 const RANDOM_SEED: u64 = 12345678901234;
 const AI_REACTION_SPEED: f32 = 0.85; // AI tracks ball at 85% of paddle speed
 
-#[cfg(feature = "transparent")]
-const BACKGROUND_COLOR: Color = Color::srgba(0.0, 0.08, 0.04, 0.3);
-#[cfg(not(feature = "transparent"))]
-const BACKGROUND_COLOR: Color = Color::srgb(0.0, 0.08, 0.04); // Dark arcade green
-
-#[cfg(feature = "window-offset")]
-fn offset_window(mut windows: Query<&mut Window>, mut done: Local<bool>) {
-    if *done {
-        return;
-    }
-    for mut window in windows.iter_mut() {
-        window.position = WindowPosition::At(IVec2::new(160, 88));
-        info!("Window positioned at: (160, 88)");
-        *done = true;
-    }
-}
-
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                decorations: false,
-                #[cfg(feature = "transparent")]
-                transparent: true,
-                #[cfg(feature = "transparent")]
-                composite_alpha_mode: CompositeAlphaMode::PostMultiplied,
-                resolution: WindowResolution::new(WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32),
-                position: WindowPosition::Centered(MonitorSelection::Primary),
-                ..default()
-            }),
+            primary_window: Some(default_window()),
             ..default()
         }))
         .insert_resource(ClearColor(BACKGROUND_COLOR))
@@ -100,7 +69,7 @@ impl BezierPath {
     fn evaluate(&self, t: f32) -> Vec2 {
         let t = t.clamp(0.0, 1.0);
         let inv_t = 1.0 - t;
-        // Quadratic bezier: B(t) = (1-t)²P0 + 2(1-t)tP1 + t²P2
+        // Quadratic bezier: B(t) = (1-t)^2*P0 + 2(1-t)tP1 + t^2*P2
         self.start * (inv_t * inv_t) + self.control * (2.0 * inv_t * t) + self.end * (t * t)
     }
 
@@ -147,9 +116,6 @@ struct Score {
     left: u32,
     right: u32,
 }
-
-#[derive(Resource)]
-struct RandomSource(SmallRng);
 
 fn setup(
     mut commands: Commands,
@@ -313,29 +279,27 @@ fn ball_collision(
     let paddle_half_h = PADDLE_HEIGHT / 2.0;
 
     // Left paddle - ball bounces right
-    if let Ok(paddle) = left_paddle.single() {
-        if ball_transform.translation.x - ball_r < paddle.translation.x + paddle_half_w
-            && ball_transform.translation.x > paddle.translation.x
-            && ball_transform.translation.y < paddle.translation.y + paddle_half_h
-            && ball_transform.translation.y > paddle.translation.y - paddle_half_h
-        {
-            ball_transform.translation.x = paddle.translation.x + paddle_half_w + ball_r;
-            let current_pos = Vec2::new(ball_transform.translation.x, ball_transform.translation.y);
-            *path = BezierPath::new_path(current_pos, true, &mut rng.0); // Go right
-        }
+    if let Ok(paddle) = left_paddle.single()
+        && ball_transform.translation.x - ball_r < paddle.translation.x + paddle_half_w
+        && ball_transform.translation.x > paddle.translation.x
+        && ball_transform.translation.y < paddle.translation.y + paddle_half_h
+        && ball_transform.translation.y > paddle.translation.y - paddle_half_h
+    {
+        ball_transform.translation.x = paddle.translation.x + paddle_half_w + ball_r;
+        let current_pos = Vec2::new(ball_transform.translation.x, ball_transform.translation.y);
+        *path = BezierPath::new_path(current_pos, true, &mut rng.0); // Go right
     }
 
     // Right paddle - ball bounces left
-    if let Ok(paddle) = right_paddle.single() {
-        if ball_transform.translation.x + ball_r > paddle.translation.x - paddle_half_w
-            && ball_transform.translation.x < paddle.translation.x
-            && ball_transform.translation.y < paddle.translation.y + paddle_half_h
-            && ball_transform.translation.y > paddle.translation.y - paddle_half_h
-        {
-            ball_transform.translation.x = paddle.translation.x - paddle_half_w - ball_r;
-            let current_pos = Vec2::new(ball_transform.translation.x, ball_transform.translation.y);
-            *path = BezierPath::new_path(current_pos, false, &mut rng.0); // Go left
-        }
+    if let Ok(paddle) = right_paddle.single()
+        && ball_transform.translation.x + ball_r > paddle.translation.x - paddle_half_w
+        && ball_transform.translation.x < paddle.translation.x
+        && ball_transform.translation.y < paddle.translation.y + paddle_half_h
+        && ball_transform.translation.y > paddle.translation.y - paddle_half_h
+    {
+        ball_transform.translation.x = paddle.translation.x - paddle_half_w - ball_r;
+        let current_pos = Vec2::new(ball_transform.translation.x, ball_transform.translation.y);
+        *path = BezierPath::new_path(current_pos, false, &mut rng.0); // Go left
     }
 
     // Scoring - ball went past edge, randomize size and color
@@ -368,9 +332,9 @@ fn ball_collision(
 }
 
 fn update_score_text(score: Res<Score>, mut query: Query<&mut Text2d, With<ScoreText>>) {
-    if score.is_changed() {
-        if let Ok(mut text) = query.single_mut() {
-            *text = Text2d::new(format!("{} - {}", score.left, score.right));
-        }
+    if score.is_changed()
+        && let Ok(mut text) = query.single_mut()
+    {
+        *text = Text2d::new(format!("{} - {}", score.left, score.right));
     }
 }
