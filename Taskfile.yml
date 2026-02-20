@@ -36,6 +36,24 @@ tasks:
   run:sprites:
     cmds:
       - target/release/sprites
+  run:bloom:
+    cmds:
+      - target/release/bloom
+  run:clock:
+    cmds:
+      - target/release/clock
+  run:life:
+    cmds:
+      - target/release/life
+  run:menu:
+    cmds:
+      - target/release/menu
+  run:orbit:
+    cmds:
+      - target/release/orbit
+  run:rope:
+    cmds:
+      - target/release/rope
   install:
     deps: [build]
     cmds:

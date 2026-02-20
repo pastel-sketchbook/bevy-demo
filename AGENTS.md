@@ -8,14 +8,28 @@ This repository contains practical examples of the Bevy game engine in Rust.
 
 - **Rust** (Edition 2024)
 - **Bevy 0.18.0** - Data-driven game engine
+- **jiff 0.2** - Timezone-aware datetime (IANA timezone database)
 - **rand** - Deterministic randomness (uses SmallRng)
 
 ## Project Structure
 
 ```
-src/bin/          # Standalone example binaries
+src/bin/          # Standalone example binaries (15 demos)
+  bloom.rs        # HDR bloom with emissive pastel shapes, post-processing
+  bouncing.rs     # 2D bouncing shapes with velocity and collision
+  clock.rs        # Analog clock with Gizmos, jiff timezone (America/Chicago)
+  cubic.rs        # 3D rotating cube with bitmap font faces and reflections
   firefly.rs      # 3D firefly simulation with blinking, movement, keyboard input
+  flocking.rs     # Boids flocking with separation, alignment, cohesion
   followings.rs   # Smooth entity interpolation/following demo
+  gravity.rs      # Gravitational attraction with sun and orbiting planets
+  life.rs         # Conway's Game of Life with mouse painting, CPU texture
+  menu.rs         # State machine (Menu/Playing/Paused/GameOver) with UI
+  orbit.rs        # 3D camera orbit controller with mouse drag and scroll
+  particles.rs    # 2D particle system with lifetime and fade-out
+  pong.rs         # Pong with bezier ball, AI paddles, scoring
+  rope.rs         # Verlet integration rope with mouse-draggable anchor
+  sprites.rs      # Sprite animation with procedural color cycling
 assets/           # Game assets (textures, models, etc.)
 ```
 
@@ -30,6 +44,7 @@ task build              # Format + build release with features
 cargo run --bin firefly
 cargo run --bin followings
 task run                # Runs firefly (default)
+task run:clock          # Run specific demo via Taskfile
 
 # Run with features
 cargo run --bin firefly --features transparent
@@ -81,7 +96,7 @@ struct FireflySpeed(f32);
 Global state accessible by systems:
 ```rust
 #[derive(Resource)]
-struct RandomSource(ChaCha8Rng);
+struct RandomSource(SmallRng);
 ```
 
 ### Systems

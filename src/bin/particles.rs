@@ -113,7 +113,7 @@ fn spawn_particles(
         let velocity = Vec2::new(angle.cos(), angle.sin()) * speed;
 
         let hue = rng.0.random_range(0.0..360.0);
-        let color = Color::hsl(hue, 0.8, 0.6);
+        let color = Color::hsl(hue, 0.55, 0.78);
 
         let lifetime = rng
             .0
