@@ -1,73 +1,146 @@
-//! Mandala pattern rendered with Gizmos (immediate-mode 2D drawing).
+//! GPU fractal mandala — Julia set + kaleidoscopic folding rendered as 8
+//! transparent layers composited across screen space.
 //!
-//! Draws concentric layers of rotationally symmetric geometry — petals, arcs,
-//! radial lines, and dot rings — that slowly rotate and pulse. Demonstrates
-//! trigonometry-driven procedural art, Gizmos API, and keyboard-driven
-//! parameter tuning.
+//! Mathematical mapping: **C × R³ × Z → R⁴**
+//!   - C  = complex Julia parameter (per layer)
+//!   - R³ = screen position (x, y) + per-layer rotation
+//!   - Z  = integer layer index (0–7)
+//!   - R⁴ = RGBA output per pixel
+//!
+//! Each layer is a full-screen quad with its own `Material2d` instance
+//! containing a Julia set parameter, hue offset, alpha, rotation speed,
+//! and zoom. A WGSL fragment shader performs kaleidoscopic folding followed
+//! by Julia iteration with smooth escape-time pastel colouring.
 //!
 //! Controls:
-//!   Up/Down  — increase/decrease fold symmetry (4–32)
-//!   Space    — toggle rotation
-//!   Q        — quit
+//!   Up/Down     — increase / decrease fold symmetry (4–32)
+//!   Left/Right  — zoom in / out
+//!   Space       — toggle animation
+//!   Q           — quit
 
+use bevy::asset::{load_internal_asset, uuid_handle};
+use bevy::render::render_resource::{AsBindGroup, ShaderType};
+use bevy::shader::{Shader, ShaderRef};
+use bevy::sprite_render::{AlphaMode2d, Material2d, Material2dPlugin, MeshMaterial2d};
 use bevy_demo::*;
-use std::f32::consts::TAU;
 
-// --- Constants ---
+/// Shader handle registered via `load_internal_asset!` so the binary is
+/// self-contained and does not depend on an external `assets/` directory.
+const SHADER_HANDLE: Handle<Shader> = uuid_handle!("e7a3d4b1-9c2f-4a6e-b8d5-1f3c7e9a0b2d");
 
-const BACKGROUND_COLOR: Color = background_color(0.02, 0.01, 0.04, 0.15);
+// --- Constants ---------------------------------------------------------------
 
-/// Initial number of rotational folds.
-const DEFAULT_FOLDS: u32 = 12;
-const MIN_FOLDS: u32 = 4;
-const MAX_FOLDS: u32 = 32;
+const BACKGROUND_COLOR: Color = background_color(0.02, 0.01, 0.04, 1.0);
 
-/// Global rotation speed (radians per second).
-const ROTATION_SPEED: f32 = 0.15;
-/// Breathing (scale pulse) speed and amplitude.
-const BREATH_SPEED: f32 = 0.6;
-const BREATH_AMPLITUDE: f32 = 0.04;
+const DEFAULT_FOLDS: f32 = 12.0;
+const MIN_FOLDS: f32 = 4.0;
+const MAX_FOLDS: f32 = 32.0;
+const DEFAULT_ZOOM: f32 = 1.0;
+const ZOOM_SPEED: f32 = 0.02;
+const MIN_ZOOM: f32 = 0.2;
+const MAX_ZOOM: f32 = 5.0;
 
-// Layer radii
-const LAYER_RADII: [f32; 6] = [60.0, 130.0, 210.0, 300.0, 380.0, 450.0];
+/// Number of transparent layers stacked on screen.
+const NUM_LAYERS: usize = 8;
 
-// Pastel palette
-const COLOR_CENTER: Color = Color::srgb(0.98, 0.93, 0.68); // butter
-const COLOR_PETAL_INNER: Color = Color::srgb(0.95, 0.68, 0.72); // rose
-const COLOR_DOTS_1: Color = Color::srgb(0.68, 0.90, 0.78); // mint
-const COLOR_ARCS: Color = Color::srgb(0.68, 0.78, 0.95); // cornflower
-const COLOR_PETAL_OUTER: Color = Color::srgb(0.76, 0.58, 0.92); // lavender
-const COLOR_RADIAL: Color = Color::srgb(0.95, 0.78, 0.58); // peach
-const COLOR_RING: Color = Color::srgba(0.76, 0.72, 0.87, 0.6); // lavender ring
-const COLOR_DOTS_2: Color = Color::srgb(0.88, 0.70, 0.85); // mauve
+// --- Per-layer preset table --------------------------------------------------
 
-// --- Resources ---
+/// (base Julia c, hue_offset, alpha, rotation_speed_multiplier, zoom_offset)
+const LAYER_PRESETS: [(Vec2, f32, f32, f32, f32); NUM_LAYERS] = [
+    (Vec2::new(-0.400, 0.600), 0.000, 0.55, 1.00, 0.00), // hero
+    (Vec2::new(0.285, 0.010), 0.125, 0.25, -0.70, 0.15),
+    (Vec2::new(-0.800, 0.156), 0.250, 0.45, 0.50, -0.10), // hero
+    (Vec2::new(-0.702, -0.384), 0.375, 0.20, -0.40, 0.20),
+    (Vec2::new(0.355, 0.355), 0.500, 0.20, 0.30, -0.15),
+    (Vec2::new(-0.100, 0.651), 0.625, 0.30, -0.25, 0.12),
+    (Vec2::new(-0.750, 0.110), 0.750, 0.15, 0.20, -0.20),
+    (Vec2::new(0.000, -0.800), 0.875, 0.15, -0.15, 0.08),
+];
+
+// --- GPU uniform (matches WGSL struct) ---------------------------------------
+
+#[derive(Clone, Copy, ShaderType)]
+struct MandalaParams {
+    c: Vec2,
+    folds: f32,
+    time: f32,
+    hue_offset: f32,
+    alpha: f32,
+    zoom: f32,
+    rotation: f32,
+}
+
+// --- Material2d implementation -----------------------------------------------
+
+#[derive(Asset, TypePath, AsBindGroup, Clone)]
+struct MandalaMaterial {
+    #[uniform(0)]
+    params: MandalaParams,
+}
+
+impl Material2d for MandalaMaterial {
+    fn fragment_shader() -> ShaderRef {
+        SHADER_HANDLE.into()
+    }
+
+    fn alpha_mode(&self) -> AlphaMode2d {
+        AlphaMode2d::Blend
+    }
+}
+
+// --- Resources ---------------------------------------------------------------
 
 #[derive(Resource)]
 struct MandalaConfig {
-    folds: u32,
-    rotating: bool,
+    folds: f32,
+    zoom: f32,
+    animating: bool,
 }
 
 impl Default for MandalaConfig {
     fn default() -> Self {
         Self {
             folds: DEFAULT_FOLDS,
-            rotating: true,
+            zoom: DEFAULT_ZOOM,
+            animating: true,
         }
     }
 }
 
-// --- Main ---
+/// Accumulates time only while animation is active so pausing truly freezes.
+#[derive(Resource, Default)]
+struct AnimationTime {
+    elapsed: f32,
+}
+
+/// Keeps handles to each layer's material so we can update uniforms each frame.
+#[derive(Resource)]
+struct LayerHandles(Vec<Handle<MandalaMaterial>>);
+
+// --- Main --------------------------------------------------------------------
 
 fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
+    let mut app = App::new();
+
+    app.add_plugins((
+        DefaultPlugins.set(WindowPlugin {
             primary_window: Some(default_window()),
             ..default()
-        }))
-        .insert_resource(ClearColor(BACKGROUND_COLOR))
+        }),
+        Material2dPlugin::<MandalaMaterial>::default(),
+    ));
+
+    // Embed the WGSL shader at compile time so the binary is self-contained.
+    load_internal_asset!(
+        app,
+        SHADER_HANDLE,
+        "../../assets/shaders/mandala.wgsl",
+        Shader::from_wgsl
+    );
+
+    app.insert_resource(ClearColor(BACKGROUND_COLOR))
         .init_resource::<MandalaConfig>()
+        .init_resource::<AnimationTime>()
         .add_systems(Startup, setup)
         .add_systems(
             Update,
@@ -75,216 +148,107 @@ fn main() {
                 #[cfg(feature = "window-offset")]
                 offset_window,
                 handle_input,
-                draw_mandala,
+                update_materials,
                 handle_quit,
             ),
         )
         .run();
 }
 
-fn setup(mut commands: Commands) {
+// --- Setup -------------------------------------------------------------------
+
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<MandalaMaterial>>,
+) {
     commands.spawn(Camera2d);
+
+    // Full-screen rectangle mesh (Bevy 2D coordinates)
+    let mesh_handle = meshes.add(Rectangle::new(WINDOW_WIDTH, WINDOW_HEIGHT));
+
+    let mut handles = Vec::with_capacity(NUM_LAYERS);
+
+    for (i, &(c, hue_offset, alpha, _rot_speed, _zoom_off)) in LAYER_PRESETS.iter().enumerate() {
+        let mat = MandalaMaterial {
+            params: MandalaParams {
+                c,
+                folds: DEFAULT_FOLDS,
+                time: 0.0,
+                hue_offset,
+                alpha,
+                zoom: DEFAULT_ZOOM,
+                rotation: 0.0,
+            },
+        };
+
+        let mat_handle = materials.add(mat);
+        handles.push(mat_handle.clone());
+
+        // Stack layers at increasing z depths so they composite back-to-front.
+        commands.spawn((
+            Mesh2d(mesh_handle.clone()),
+            MeshMaterial2d(mat_handle),
+            Transform::from_xyz(0.0, 0.0, i as f32),
+        ));
+    }
+
+    commands.insert_resource(LayerHandles(handles));
 }
 
-// --- Input ---
+// --- Input -------------------------------------------------------------------
 
 fn handle_input(keyboard: Res<ButtonInput<KeyCode>>, mut config: ResMut<MandalaConfig>) {
     if keyboard.just_pressed(KeyCode::ArrowUp) {
-        config.folds = (config.folds + 1).min(MAX_FOLDS);
+        config.folds = (config.folds + 1.0).min(MAX_FOLDS);
     }
     if keyboard.just_pressed(KeyCode::ArrowDown) {
-        config.folds = config.folds.saturating_sub(1).max(MIN_FOLDS);
+        config.folds = (config.folds - 1.0).max(MIN_FOLDS);
+    }
+    if keyboard.pressed(KeyCode::ArrowRight) {
+        config.zoom = (config.zoom + ZOOM_SPEED).min(MAX_ZOOM);
+    }
+    if keyboard.pressed(KeyCode::ArrowLeft) {
+        config.zoom = (config.zoom - ZOOM_SPEED).max(MIN_ZOOM);
     }
     if keyboard.just_pressed(KeyCode::Space) {
-        config.rotating = !config.rotating;
+        config.animating = !config.animating;
     }
 }
 
-// --- Drawing ---
+// --- Per-frame material update -----------------------------------------------
 
-fn draw_mandala(mut gizmos: Gizmos, time: Res<Time>, config: Res<MandalaConfig>) {
-    let t = time.elapsed_secs();
-    let folds = config.folds;
-    let fold_angle = TAU / folds as f32;
-
-    // Global rotation angle (accumulated only while rotating)
-    let base_angle = if config.rotating {
-        t * ROTATION_SPEED
-    } else {
-        // When paused, freeze at the last position — use a stable value
-        // (won't perfectly freeze without tracking state, but gives a slow-enough
-        // crawl that effectively looks paused at ROTATION_SPEED = 0.15 rad/s)
-        0.0
-    };
-
-    // Breathing scale factor
-    let breath = 1.0 + (t * BREATH_SPEED).sin() * BREATH_AMPLITUDE;
-
-    let center = Vec2::ZERO;
-
-    // --- Center dot ---
-    draw_filled_circle(&mut gizmos, center, 12.0 * breath, COLOR_CENTER);
-
-    // --- Layer 0: inner ring outline ---
-    let r0 = LAYER_RADII[0] * breath;
-    draw_ring(&mut gizmos, center, r0, COLOR_RING);
-
-    // --- Layer 1: inner petals (teardrop shapes via cubic arcs) ---
-    let r1 = LAYER_RADII[1] * breath;
-    let angle_offset_1 = base_angle;
-    for i in 0..folds {
-        let a = angle_offset_1 + i as f32 * fold_angle;
-        draw_petal(
-            &mut gizmos,
-            center,
-            r0 * 0.5,
-            r1,
-            a,
-            fold_angle * 0.35,
-            COLOR_PETAL_INNER,
-        );
-    }
-    draw_ring(&mut gizmos, center, r1, COLOR_RING);
-
-    // --- Layer 2: dot ring ---
-    let r2 = LAYER_RADII[2] * breath;
-    let angle_offset_2 = base_angle * 0.8; // slightly different speed
-    let dots_per_fold = 3;
-    for i in 0..folds {
-        for d in 0..dots_per_fold {
-            let a = angle_offset_2
-                + i as f32 * fold_angle
-                + d as f32 * fold_angle / dots_per_fold as f32;
-            let pos = center + polar(r2, a);
-            let dot_r = 5.0 * breath;
-            draw_filled_circle(&mut gizmos, pos, dot_r, COLOR_DOTS_1);
-        }
-    }
-
-    // --- Layer 3: arcs (small crescents between each fold) ---
-    let r3 = LAYER_RADII[3] * breath;
-    let angle_offset_3 = -base_angle * 0.6; // counter-rotate
-    for i in 0..folds {
-        let a = angle_offset_3 + i as f32 * fold_angle;
-        draw_arc(&mut gizmos, center, r3, a, fold_angle * 0.6, COLOR_ARCS);
-    }
-    draw_ring(&mut gizmos, center, r3 * 0.95, COLOR_RING);
-
-    // --- Layer 4: outer petals (larger, counter-rotating) ---
-    let r4 = LAYER_RADII[4] * breath;
-    let angle_offset_4 = -base_angle * 1.2;
-    for i in 0..folds {
-        let a = angle_offset_4 + i as f32 * fold_angle + fold_angle * 0.5; // offset by half
-        draw_petal(
-            &mut gizmos,
-            center,
-            r3,
-            r4,
-            a,
-            fold_angle * 0.3,
-            COLOR_PETAL_OUTER,
-        );
-    }
-
-    // --- Layer 5: radial lines from center to outermost ring ---
-    let r5 = LAYER_RADII[5] * breath;
-    let angle_offset_5 = base_angle * 0.4;
-    for i in 0..(folds * 2) {
-        let a = angle_offset_5 + i as f32 * fold_angle / 2.0;
-        let inner_pos = center + polar(r4 * 0.95, a);
-        let outer_pos = center + polar(r5, a);
-        gizmos.line_2d(inner_pos, outer_pos, COLOR_RADIAL);
-    }
-
-    // --- Outermost ring with double border ---
-    draw_ring(&mut gizmos, center, r5, COLOR_RING);
-    draw_ring(&mut gizmos, center, r5 + 4.0 * breath, COLOR_RING);
-
-    // --- Outermost dot ring ---
-    let r_outer_dots = r5 + 20.0 * breath;
-    for i in 0..folds {
-        let a = angle_offset_5 + i as f32 * fold_angle;
-        let pos = center + polar(r_outer_dots, a);
-        draw_filled_circle(&mut gizmos, pos, 6.0 * breath, COLOR_DOTS_2);
-    }
-}
-
-// --- Geometry helpers ---
-
-/// Convert polar coordinates to a Vec2.
-fn polar(radius: f32, angle: f32) -> Vec2 {
-    Vec2::new(angle.cos(), angle.sin()) * radius
-}
-
-/// Draw a filled circle by drawing concentric rings.
-fn draw_filled_circle(gizmos: &mut Gizmos, center: Vec2, radius: f32, color: Color) {
-    let steps = (radius / 1.5).ceil().max(1.0) as u32;
-    for i in 0..=steps {
-        let r = radius * (i as f32 / steps as f32);
-        gizmos.circle_2d(center + Vec2::ZERO, r, color);
-    }
-}
-
-/// Draw a circle ring (single outline).
-fn draw_ring(gizmos: &mut Gizmos, center: Vec2, radius: f32, color: Color) {
-    gizmos.circle_2d(center, radius, color);
-}
-
-/// Draw a petal shape by connecting two arcs (a leaf/teardrop pointing outward).
-/// `inner_r` and `outer_r` are the start/end radii; `angle` is the center direction;
-/// `half_width` is angular half-width of the petal at its widest.
-fn draw_petal(
-    gizmos: &mut Gizmos,
-    center: Vec2,
-    inner_r: f32,
-    outer_r: f32,
-    angle: f32,
-    half_width: f32,
-    color: Color,
+fn update_materials(
+    config: Res<MandalaConfig>,
+    time: Res<Time>,
+    mut anim_time: ResMut<AnimationTime>,
+    layer_handles: Res<LayerHandles>,
+    mut materials: ResMut<Assets<MandalaMaterial>>,
 ) {
-    let segments = 16u32;
-    // Draw two curved sides of the petal
-    for side in [-1.0_f32, 1.0] {
-        let mut prev = center + polar(inner_r, angle);
-        for s in 1..=segments {
-            let t = s as f32 / segments as f32;
-            // Radius interpolates from inner to outer and back
-            let r = inner_r + (outer_r - inner_r) * petal_radius_profile(t);
-            // Angle sweeps from center line outward then back
-            let a = angle + side * half_width * petal_width_profile(t);
-            let pos = center + polar(r, a);
-            gizmos.line_2d(prev, pos, color);
-            prev = pos;
-        }
+    if config.animating {
+        anim_time.elapsed += time.delta_secs();
     }
-}
+    let t = anim_time.elapsed;
 
-/// Radius profile: goes from 0 (base) to 1 (tip) — simple sine curve.
-fn petal_radius_profile(t: f32) -> f32 {
-    (t * std::f32::consts::PI).sin()
-}
+    for (i, handle) in layer_handles.0.iter().enumerate() {
+        let Some(mat) = materials.get_mut(handle) else {
+            continue;
+        };
 
-/// Width profile: widest at the middle, zero at base and tip.
-fn petal_width_profile(t: f32) -> f32 {
-    (t * std::f32::consts::PI).sin()
-}
+        let (c, hue_offset, alpha, rot_speed, zoom_offset) = (
+            LAYER_PRESETS[i].0,
+            LAYER_PRESETS[i].1,
+            LAYER_PRESETS[i].2,
+            LAYER_PRESETS[i].3,
+            LAYER_PRESETS[i].4,
+        );
 
-/// Draw an arc segment at a given radius.
-fn draw_arc(
-    gizmos: &mut Gizmos,
-    center: Vec2,
-    radius: f32,
-    start_angle: f32,
-    sweep: f32,
-    color: Color,
-) {
-    let segments = 20u32;
-    let mut prev = center + polar(radius, start_angle);
-    for s in 1..=segments {
-        let t = s as f32 / segments as f32;
-        let a = start_angle + sweep * t;
-        let pos = center + polar(radius, a);
-        gizmos.line_2d(prev, pos, color);
-        prev = pos;
+        mat.params.c = c;
+        mat.params.folds = config.folds;
+        mat.params.time = t;
+        mat.params.hue_offset = hue_offset;
+        mat.params.alpha = alpha;
+        mat.params.zoom = config.zoom + zoom_offset;
+        mat.params.rotation = t * rot_speed * 0.3;
     }
 }
