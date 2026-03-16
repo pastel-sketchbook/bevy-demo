@@ -68,6 +68,10 @@ struct MandalaParams {
     alpha: f32,
     zoom: f32,
     rotation: f32,
+    layer_depth: f32,
+    _pad1: f32,
+    _pad2: f32,
+    _pad3: f32,
 }
 
 // --- Material2d implementation -----------------------------------------------
@@ -179,6 +183,10 @@ fn setup(
                 alpha,
                 zoom: DEFAULT_ZOOM,
                 rotation: 0.0,
+                layer_depth: i as f32 / (NUM_LAYERS - 1) as f32,
+                _pad1: 0.0,
+                _pad2: 0.0,
+                _pad3: 0.0,
             },
         };
 
@@ -250,5 +258,6 @@ fn update_materials(
         mat.params.alpha = alpha;
         mat.params.zoom = config.zoom + zoom_offset;
         mat.params.rotation = t * rot_speed * 0.3;
+        mat.params.layer_depth = i as f32 / (NUM_LAYERS - 1) as f32;
     }
 }

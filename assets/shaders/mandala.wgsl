@@ -19,6 +19,10 @@ struct MandalaParams {
     alpha: f32,            // Per-layer opacity
     zoom: f32,             // Zoom level
     rotation: f32,         // Per-layer rotation (radians)
+    layer_depth: f32,      // Normalised layer depth [0,1] for 3D lighting
+    _pad1: f32,
+    _pad2: f32,
+    _pad3: f32,
 };
 
 @group(2) @binding(0)
@@ -126,6 +130,36 @@ fn julia(z_in: vec2<f32>, c: vec2<f32>) -> f32 {
     return f32(i) + 1.0 - nu;
 }
 
+// --- 3D lighting helpers ---------------------------------------------------
+
+/// Compute the fractal "height" at a UV point for normal estimation.
+fn fractal_height(uv_in: vec2<f32>, c: vec2<f32>) -> f32 {
+    let ca = cos(params.rotation);
+    let sa = sin(params.rotation);
+    let rotated = vec2(uv_in.x * ca - uv_in.y * sa, uv_in.x * sa + uv_in.y * ca);
+    let p = rotated / params.zoom;
+    let folded = kaleidoscope(p, params.folds);
+    let si = julia(folded, c);
+    if si < 0.0 { return 0.0; }
+    return si;
+}
+
+/// Estimate surface normal from the fractal heightfield using central differences.
+fn estimate_normal(uv_in: vec2<f32>, c: vec2<f32>) -> vec3<f32> {
+    let eps = 0.002;
+    let hL = fractal_height(uv_in - vec2(eps, 0.0), c);
+    let hR = fractal_height(uv_in + vec2(eps, 0.0), c);
+    let hD = fractal_height(uv_in - vec2(0.0, eps), c);
+    let hU = fractal_height(uv_in + vec2(0.0, eps), c);
+
+    let height_scale = 0.15;
+    return normalize(vec3(
+        (hL - hR) * height_scale,
+        (hD - hU) * height_scale,
+        1.0,
+    ));
+}
+
 // --- Fragment entry point --------------------------------------------------
 
 @fragment
@@ -160,14 +194,39 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         return vec4(0.0, 0.0, 0.0, 0.0);
     }
 
-    let rgb = colour_from_iter(smooth_i) * 1.4;
+    let base_rgb = colour_from_iter(smooth_i) * 1.4;
+
+    // --- 3D lighting ---
+    // Light direction orbits slowly; each layer gets a depth-offset angle
+    let light_angle = params.time * 0.2 + params.layer_depth * PI * 0.5;
+    let light_dir = normalize(vec3(cos(light_angle) * 0.6, sin(light_angle) * 0.6, 1.0));
+
+    // Estimate surface normal from fractal heightfield
+    let normal = estimate_normal(uv, c);
+
+    // Diffuse (Lambert)
+    let ndotl = max(dot(normal, light_dir), 0.0);
+    let ambient = 0.35;
+    let diffuse = ambient + (1.0 - ambient) * ndotl;
+
+    // Specular (Blinn-Phong)
+    let view_dir = vec3(0.0, 0.0, 1.0);
+    let half_dir = normalize(light_dir + view_dir);
+    let spec = pow(max(dot(normal, half_dir), 0.0), 32.0);
+    let specular_color = vec3(1.0, 1.0, 1.0) * spec * 0.4;
+
+    // Rim light — glow at edges perpendicular to camera
+    let rim = 1.0 - max(dot(normal, view_dir), 0.0);
+    let rim_glow = pow(rim, 3.0) * 0.3;
+    let rim_color = base_rgb * rim_glow;
+
+    let lit_rgb = base_rgb * diffuse + specular_color + rim_color;
 
     // Radial vignette for soft edges
     let dist = length(uv);
     let vignette = smoothstep(1.2, 0.2, dist);
 
-    // Fade out pixels far from the set boundary to keep fractal detail
-    // crisp. Wider band so more of the fractal is visible.
+    // Fade out pixels far from the set boundary
     let boundary = smoothstep(55.0, 3.0, smooth_i) * smoothstep(0.2, 1.5, smooth_i);
     let a = params.alpha * vignette * boundary;
 
@@ -176,5 +235,5 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         return vec4(0.0, 0.0, 0.0, 0.0);
     }
 
-    return vec4(rgb, a);
+    return vec4(lit_rgb, a);
 }
