@@ -9,9 +9,15 @@ tasks:
   run:
     cmds:
       - target/release/$PGM_NAME
+  run:bloom:
+    cmds:
+      - target/release/bloom
   run:bouncing:
     cmds:
       - target/release/bouncing
+  run:clock:
+    cmds:
+      - target/release/clock
   run:cubic:
     cmds:
       - target/release/cubic
@@ -27,33 +33,30 @@ tasks:
   run:gravity:
     cmds:
       - target/release/gravity
-  run:particles:
-    cmds:
-      - target/release/particles
-  run:pong:
-    cmds:
-      - target/release/pong
-  run:sprites:
-    cmds:
-      - target/release/sprites
-  run:bloom:
-    cmds:
-      - target/release/bloom
-  run:clock:
-    cmds:
-      - target/release/clock
   run:life:
     cmds:
       - target/release/life
+  run:mandala:
+    cmds:
+      - target/release/mandala
   run:menu:
     cmds:
       - target/release/menu
   run:orbit:
     cmds:
       - target/release/orbit
+  run:particles:
+    cmds:
+      - target/release/particles
+  run:pong:
+    cmds:
+      - target/release/pong
   run:rope:
     cmds:
       - target/release/rope
+  run:sprites:
+    cmds:
+      - target/release/sprites
   install:
     deps: [build]
     cmds:
