@@ -7,14 +7,15 @@ This repository contains practical examples of the Bevy game engine in Rust.
 ## Tech Stack
 
 - **Rust** (Edition 2024)
-- **Bevy 0.18.0** - Data-driven game engine
+- **Bevy 0.18** - Data-driven game engine
 - **jiff 0.2** - Timezone-aware datetime (IANA timezone database)
 - **rand** - Deterministic randomness (uses SmallRng)
 
 ## Project Structure
 
 ```
-src/bin/          # Standalone example binaries (15 demos)
+src/lib.rs        # Shared library: re-exports, constants, systems, components
+src/bin/          # Standalone example binaries (16 demos)
   bloom.rs        # HDR bloom with emissive pastel shapes, post-processing
   bouncing.rs     # 2D bouncing shapes with velocity and collision
   clock.rs        # Analog clock with Gizmos, jiff timezone (America/Chicago)
@@ -24,12 +25,14 @@ src/bin/          # Standalone example binaries (15 demos)
   followings.rs   # Smooth entity interpolation/following demo
   gravity.rs      # Gravitational attraction with sun and orbiting planets
   life.rs         # Conway's Game of Life with mouse painting, CPU texture
+  mandala.rs      # GPU fractal mandala (Julia set + kaleidoscopic WGSL shader)
   menu.rs         # State machine (Menu/Playing/Paused/GameOver) with UI
   orbit.rs        # 3D camera orbit controller with mouse drag and scroll
   particles.rs    # 2D particle system with lifetime and fade-out
   pong.rs         # Pong with bezier ball, AI paddles, scoring
   rope.rs         # Verlet integration rope with mouse-draggable anchor
   sprites.rs      # Sprite animation with procedural color cycling
+docs/rationale/   # Math rationale + Bevy patterns reference (16 files)
 assets/           # Game assets (textures, models, etc.)
 ```
 

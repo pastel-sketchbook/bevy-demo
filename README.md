@@ -22,6 +22,7 @@ A collection of self-contained examples for the [Bevy](https://bevyengine.org/) 
 | `followings` | Smooth entity interpolation/following | Lerp, `Transform`, system chaining |
 | `gravity` | Gravitational attraction with a sun and orbiting planets (Space to add) | N-body simulation, `SmallRng`, keyboard input |
 | `life` | Conway's Game of Life with mouse painting and CPU texture rendering | `FixedUpdate`, mouse input, `Image` pixel writes |
+| `mandala` | GPU fractal mandala with Julia set + kaleidoscopic folding (8 layers) | `Material2d`, WGSL shader, `AsBindGroup`, `AlphaMode2d` |
 | `menu` | State machine: Menu / Playing / Paused / GameOver with UI buttons | `States`, `OnEnter`/`OnExit`, UI nodes, `Button`, `Interaction` |
 | `orbit` | 3D camera orbit controller with auto-rotating pastel primitives | `AccumulatedMouseMotion`, `AccumulatedMouseScroll`, spherical coords |
 | `particles` | Continuous particle spawning with velocity, lifetime, and fade-out | Entity lifecycle, `Sprite`, despawn |
@@ -68,7 +69,8 @@ cargo run --bin bloom --features "transparent,window-offset"
 ## Project Structure
 
 ```
-src/bin/           # 15 standalone example binaries
+src/lib.rs         # Shared library: re-exports, constants, systems, components
+src/bin/           # 16 standalone example binaries
   bloom.rs         # HDR bloom post-processing
   bouncing.rs      # 2D bouncing shapes
   clock.rs         # Analog clock with Gizmos + jiff timezone
@@ -78,14 +80,16 @@ src/bin/           # 15 standalone example binaries
   followings.rs    # Smooth interpolation
   gravity.rs       # Orbital mechanics
   life.rs          # Conway's Game of Life
+  mandala.rs       # GPU fractal mandala (Julia set + WGSL shader)
   menu.rs          # State machine + UI
   orbit.rs         # 3D camera orbit controller
   particles.rs     # Particle system
   pong.rs          # Pong game
   rope.rs          # Verlet rope physics
   sprites.rs       # Sprite animation
+docs/rationale/    # Math rationale + Bevy patterns reference (16 files)
 assets/            # Game assets
-Cargo.toml         # 15 [[bin]] entries + dependencies
+Cargo.toml         # 16 [[bin]] entries + dependencies
 Taskfile.yml       # Build and run tasks
 AGENTS.md          # AI agent conventions
 ```
@@ -94,7 +98,7 @@ AGENTS.md          # AI agent conventions
 
 Each example is designed around a specific learning goal:
 
-**Rendering techniques** — The demos cover the rendering spectrum from immediate-mode Gizmos (`clock`, `rope`) to CPU-drawn textures (`life`, `cubic`), standard 3D materials with lighting (`bloom`, `orbit`, `firefly`), and 2D sprites/meshes (`bouncing`, `particles`, `sprites`, `pong`).
+**Rendering techniques** — The demos cover the rendering spectrum from immediate-mode Gizmos (`clock`, `rope`) to CPU-drawn textures (`life`, `cubic`), standard 3D materials with lighting (`bloom`, `orbit`, `firefly`), 2D sprites/meshes (`bouncing`, `particles`, `sprites`, `pong`), and GPU shaders (`mandala` — custom WGSL fragment shader with `Material2d`).
 
 **Input handling** — Keyboard input appears in most demos (Q to quit, Space for actions). Mouse input is demonstrated across three interaction models: click-to-paint (`life`), drag-to-orbit (`orbit`), and drag-to-move (`rope`).
 
@@ -106,4 +110,4 @@ Each example is designed around a specific learning goal:
 
 **Visual style** — All demos use a consistent pastel color palette with dark backgrounds. 3D scenes use semi-transparent silver ground planes. The aesthetic is intentionally soft to keep the focus on the code patterns rather than art assets.
 
-**Self-contained** — Every binary runs independently with zero asset dependencies (except `cubic` which embeds its bitmap font). No shared library crate — duplication across binaries is acceptable because each file should be readable in isolation.
+**Self-contained** — Every binary runs independently with zero asset dependencies (except `cubic` which embeds its bitmap font). A shared library crate (`src/lib.rs`) re-exports common Bevy types, window configuration, and shared systems (`handle_quit`, `offset_window`, `RandomSource`, `Velocity`), eliminating ~30 lines of boilerplate per binary while each file remains readable in isolation.
