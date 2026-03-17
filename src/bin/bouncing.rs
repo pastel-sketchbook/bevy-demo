@@ -87,7 +87,8 @@ fn setup(
     commands.spawn(Camera2d);
 
     let shape_meshes = create_shape_meshes(&mut meshes);
-    let window = window.single().unwrap();
+    let Ok(window) = window.single() else { return };
+
     let half_width = window.width() / 2.0 - MAX_SIZE;
     let half_height = window.height() / 2.0 - MAX_SIZE;
 

@@ -89,10 +89,6 @@ struct LeftReflection;
 struct RightReflection;
 
 #[derive(Component)]
-#[allow(dead_code)]
-struct CubeFace(usize);
-
-#[derive(Component)]
 struct RotationState {
     axis: Vec3,
     speed: f32,
@@ -128,9 +124,9 @@ fn hsl_to_rgb(h: f32, s: f32, l: f32) -> [u8; 3] {
     };
     let m = l - c / 2.0;
     [
-        ((r1 + m) * 255.0) as u8,
-        ((g1 + m) * 255.0) as u8,
-        ((b1 + m) * 255.0) as u8,
+        ((r1 + m) * 255.0).clamp(0.0, 255.0) as u8,
+        ((g1 + m) * 255.0).clamp(0.0, 255.0) as u8,
+        ((b1 + m) * 255.0).clamp(0.0, 255.0) as u8,
     ]
 }
 
@@ -165,6 +161,7 @@ fn draw_char(data: &mut [u8], ch: usize, offset_x: u32, offset_y: u32, scale: u3
 
 /// Fill an image with a background color and draw a single large character centered.
 fn render_face(image: &mut Image, ch: usize, bg: [u8; 3], fg: [u8; 3]) {
+    // Invariant: image created with RenderAssetUsages::MAIN_WORLD, so CPU data is always present.
     let data = image.data.as_mut().expect("Image has no CPU data");
     // Fill background
     for y in 0..TEXTURE_SIZE {
@@ -354,7 +351,6 @@ fn setup(
                 Visibility::Visible,
                 Mesh3d(face_mesh.clone()),
                 MeshMaterial3d(material),
-                CubeFace(i),
             ))
             .id();
 

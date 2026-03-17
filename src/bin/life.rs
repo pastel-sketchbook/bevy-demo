@@ -248,6 +248,7 @@ fn render_grid(
     let Some(image) = images.get_mut(&handle.0) else {
         return;
     };
+    // Invariant: image created with RenderAssetUsages::MAIN_WORLD, so CPU data is always present.
     let data = image.data.as_mut().expect("Image has no CPU data");
 
     for y in 0..GRID_HEIGHT {

@@ -81,11 +81,13 @@ fn flocking(mut query: Query<(Entity, &Transform, &mut Velocity), With<Boid>>) {
         .collect();
 
     for (entity, _, mut velocity) in query.iter_mut() {
-        let (pos, vel) = boids
+        let Some((pos, vel)) = boids
             .iter()
             .find(|(e, _, _)| *e == entity)
             .map(|(_, p, v)| (*p, *v))
-            .unwrap();
+        else {
+            continue;
+        };
 
         let mut separation = Vec2::ZERO;
         let mut alignment = Vec2::ZERO;

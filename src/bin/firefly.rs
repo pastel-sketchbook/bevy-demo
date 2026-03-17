@@ -1,3 +1,9 @@
+//! 3D firefly simulation with blinking, movement, and keyboard-controlled spawning.
+//!
+//! Press Space to add fireflies, Backspace to remove them.
+//! Each firefly drifts through a bounded 3D volume with randomised speed and
+//! a pulsing point light that fades in and out via alpha blending.
+
 use bevy_demo::*;
 
 // --- Constants ---
