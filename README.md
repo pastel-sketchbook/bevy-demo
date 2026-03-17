@@ -87,12 +87,21 @@ src/bin/           # 16 standalone example binaries
   pong.rs          # Pong game
   rope.rs          # Verlet rope physics
   sprites.rs       # Sprite animation
-docs/rationale/    # Math rationale + Bevy patterns reference (16 files)
+docs/rationale/    # Math rationale + Bevy patterns reference (17 files)
+screenshots/       # Example screenshots
 assets/            # Game assets
 Cargo.toml         # 16 [[bin]] entries + dependencies
 Taskfile.yml       # Build and run tasks
 AGENTS.md          # AI agent conventions
 ```
+
+## Screenshots
+
+### Mandala
+
+![mandala](screenshots/mandala.png)
+
+GPU fractal mandala — 8 transparent layers of Julia set iteration with kaleidoscopic folding, Blinn-Phong lighting, and animated colour cycling.
 
 ## Design Rationale
 
